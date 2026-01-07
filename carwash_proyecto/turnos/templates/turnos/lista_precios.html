@@ -1,0 +1,95 @@
+{% extends 'turnos/base.html' %}
+{% load static %}
+
+{% block title %}Lista de Precios - Carwash{% endblock %}
+
+{% block content %}
+<section class="py-5 bg-light">
+  <div class="container">
+    <h1 class="text-center mb-5 fw-bold text-primary">LISTA DE PRECIOS</h1>
+    <h4 class="text-center text-muted mb-4">Lavado de Autos</h4>
+
+    <div class="row g-4">
+      <!-- Lavado Exterior -->
+      <div class="col-md-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body">
+            <h5 class="card-title text-center text-uppercase fw-bold mb-3 text-primary">Lavado Exterior</h5>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Pequeño</span><strong>$6.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Mediano</span><strong>$8.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Grande</span><strong>$10.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Grande XL</span><strong>$12.000</strong></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lavado Interior -->
+      <div class="col-md-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body">
+            <h5 class="card-title text-center text-uppercase fw-bold mb-3 text-primary">Lavado Interior</h5>
+            <p class="text-muted small text-center">Incluye aspirado, limpieza de superficies, vidrios y aromatizante.</p>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Pequeño</span><strong>$7.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Mediano</span><strong>$9.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Grande</span><strong>$11.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Grande XL</span><strong>$13.000</strong></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lavado Básico -->
+      <div class="col-md-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body">
+            <h5 class="card-title text-center text-uppercase fw-bold mb-3 text-primary">Lavado Básico</h5>
+            <p class="text-muted small text-center">Incluye lavado exterior e interior, cera en aerosol y aspirado de maletero.</p>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Pequeño</span><strong>$10.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Mediano</span><strong>$12.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Grande</span><strong>$14.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Grande XL</span><strong>$16.000</strong></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lavado Full -->
+      <div class="col-md-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body">
+            <h5 class="card-title text-center text-uppercase fw-bold mb-3 text-primary">Lavado Full</h5>
+            <p class="text-muted small text-center">Incluye lavado exterior e interior con silicona, cera premium, aspirado de maletero y tapices.</p>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Pequeño</span><strong>$12.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Mediano</span><strong>$14.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Grande</span><strong>$16.000</strong></li>
+              <li class="list-group-item d-flex justify-content-between"><span>Auto Grande XL</span><strong>$18.000</strong></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Otros servicios -->
+    <div class="mt-5 text-center">
+      <h5 class="fw-bold text-primary mb-3">Otros Servicios</h5>
+      <ul class="list-unstyled">
+        <li>Pulido de Focos — <strong>Desde $10.000</strong></li>
+        <li>Alfombras de Hogar — <strong>Desde $8.000</strong></li>
+        <li>Tapiz — <strong>Desde $8.000</strong></li>
+      </ul>
+    </div>
+
+    <!-- Contacto -->
+    <div class="text-center mt-5">
+      <p class="mb-1">📱 <strong>WhatsApp:</strong> +56 9 1234 5678</p>
+      <p class="mb-1">📍 Av. Concha y Toro 2730, 8150215 Puente Alto, Región Metropolitana</p>
+      <p class="text-muted">Síguenos en Instagram: <a href="https://www.instagram.com/_br1.exe/" target="_blank">@carwashmanantial</a></p>
+    </div>
+  </div>
+</section>
+{% endblock %}

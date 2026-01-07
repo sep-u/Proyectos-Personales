@@ -1,0 +1,11 @@
+asgiref==3.8.1
+Django==5.1
+django-widget-tweaks==1.5.0
+jsonpointer==2.1
+pillow==11.0.0
+psycopg2==2.9.10
+setuptools==72.1.0
+sqlparse==0.5.1
+tk==0.1.0
+tzdata==2024.1
+wheel==0.43.0

@@ -1,0 +1,41 @@
+{% extends 'turnos/base.html' %}
+{% block title %}Mis Reservas{% endblock %}
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">Mis Reservas</h2>
+
+  {% if reservas %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Servicio</th>
+          <th>Fecha</th>
+          <th>Hora</th>
+          <th>Teléfono</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for reserva in reservas %}
+        <tr>
+          <td>{{ reserva.tipo_servicio }}</td>
+          <td>{{ reserva.fecha }}</td>
+          <td>{{ reserva.hora }}</td>
+          <td>{{ reserva.telefono }}</td>
+          <td>
+            <a href="{% url 'eliminar_reserva' reserva.id %}" 
+               class="btn btn-danger btn-sm"
+               onclick="return confirm('¿Seguro que deseas eliminar esta reserva?');">
+              Eliminar
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-center">No tienes reservas aún.</p>
+  {% endif %}
+</div>
+{% endblock %}

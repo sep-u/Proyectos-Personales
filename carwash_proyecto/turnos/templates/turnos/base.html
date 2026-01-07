@@ -1,0 +1,75 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Carwash{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{% static 'css/styles.css' %}" rel="stylesheet">
+</head>
+
+<body>
+  <!-- Barra de navegación -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-light py-4 shadow-sm">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}">
+        <img src="{% static 'img/logo.jpg' %}" alt="Logo Carwash" width="120" height="100" class="me-3">
+        <span class="fs-3">Carwash</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <a class="nav-link {% block active_home %}{% endblock %}" href="{% url 'home' %}">Inicio</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% block active_reservas %}{% endblock %}" href="{% url 'reservas' %}">Reservar turno</a>
+          </li>
+          {% if user.is_authenticated %}
+          <li class="nav-item">
+            <a class="nav-link {% block active_mis_reservas %}{% endblock %}" href="{% url 'mis_reservas' %}">Mis reservas</a>
+          </li>
+          {% endif %}
+          {% if user.is_authenticated %}
+          <li class="nav-item">
+            <span class="nav-link">Hola, {{ user.first_name }}</span>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link text-danger" href="{% url 'logout' %}">Cerrar sesión</a>
+          </li>
+          {% else %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'login' %}">Iniciar sesión</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'register' %}">Registrarse</a>
+          </li>
+          {% endif %}
+        </ul>
+
+      </div>
+    </div>
+  </nav>
+
+  <!-- Contenido dinámico -->
+  <main>
+    {% block content %}
+    {% endblock %}
+  </main>
+
+  <!-- Pie de página -->
+  <footer class="footer py-4 bg-dark text-white mt-5">
+    <div class="container text-center">
+      <p>© 2025 Carwash · Todos los derechos reservados</p>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

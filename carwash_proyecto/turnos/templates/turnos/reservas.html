@@ -1,0 +1,80 @@
+{% extends 'turnos/base.html' %}
+{% load static %}
+
+
+{% block title %}Reservas - Carwash{% endblock %}
+{% block active_reservas %}active{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">Reserva tu turno</h2>
+
+  <!-- Paso 1: Selección de día y hora -->
+  <div id="step1">
+    <div class="card shadow-sm p-4 mx-auto" style="max-width: 500px;">
+      <h5 class="text-center mb-3">Selecciona la fecha y hora</h5>
+      <form id="select-date-form">
+        <label for="fecha" class="form-label">Fecha</label>
+        <input type="date" id="fecha" class="form-control" required>
+
+        <label for="hora" class="form-label mt-3">Hora</label>
+        <input type="time" id="hora" class="form-control" required>
+
+        <button type="button" id="nextBtn" class="btn btn-primary w-100 mt-4">Continuar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Paso 2: Formulario (oculto al inicio) -->
+  <div id="step2" class="mt-5" style="display: none;">
+    <div class="card shadow-sm p-4 mx-auto" style="max-width: 500px;">
+      <h5 class="text-center mb-3">Completa tus datos</h5>
+      <form method="POST" id="reservaForm">
+        {% csrf_token %}
+        <input type="hidden" name="fecha" id="formFecha">
+        <input type="hidden" name="hora" id="formHora">
+
+        <div class="mb-3">
+          <label class="form-label">Nombre</label>
+          <input type="text" name="nombre" class="form-control" value="{{ user.first_name }}"required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Apellido</label>
+          <input type="text" name="apellido" class="form-control" value="{{ user.last_name }}"required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ user.email }}"required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Teléfono</label>
+          <input type="text" name="telefono" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Tipo de servicio</label>
+          <select name="tipo_servicio" class="form-select" required>
+            <option value="">Selecciona...</option>
+            <option value="Lavado exterior">Lavado exterior</option>
+            <option value="Lavado interior">Lavado interior</option>
+            <option value="Lavado basico">Lavado basico</option>
+            <option value="Lavado full">Lavado full</option>
+            <option value="Pulido">Pulido</option>
+            <option value="Tapiz">Tapiz</option>
+            <option value="Alfombras de hogar">Alfombras de hogar</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-success w-100">Confirmar Reserva</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Enlace al JS externo -->
+<script src="{% static 'js/reservas.js' %}"></script>
+
+  <div class="container py-5">
+    <h1 class="text-center">Reservar Turno</h1>
+    <p class="text-center">Aquí irá el formulario de reservas.</p>
+  </div>
+{% endblock %}
