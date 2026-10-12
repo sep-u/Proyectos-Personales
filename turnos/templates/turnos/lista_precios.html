@@ -1,0 +1,50 @@
+{% extends 'turnos/base.html' %}
+{% load static formato %}
+
+{% block title %}Lista de Precios - Carwash{% endblock %}
+
+{% block content %}
+<section class="py-5 bg-light">
+  <div class="container">
+    <h1 class="text-center mb-5 fw-bold text-primary">LISTA DE PRECIOS</h1>
+    <h4 class="text-center text-muted mb-4">Lavado de Autos</h4>
+
+    <div class="row g-4">
+      {% for servicio in servicios %}{% if not servicio.precio_desde %}
+      <div class="col-md-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body">
+            <h5 class="card-title text-center text-uppercase fw-bold mb-3 text-primary">{{ servicio.nombre }}</h5>
+            {% if servicio.descripcion %}<p class="text-muted small text-center">{{ servicio.descripcion }}</p>{% endif %}
+            <ul class="list-group list-group-flush">
+              {% for p in servicio.precios.all %}
+              <li class="list-group-item d-flex justify-content-between"><span>{{ p.get_tamano_vehiculo_display }}</span><strong>{{ p.precio|clp }}</strong></li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+      {% endif %}{% endfor %}
+    </div>
+
+    <!-- Otros servicios -->
+    <div class="mt-5 text-center">
+      <h5 class="fw-bold text-primary mb-3">Otros Servicios</h5>
+      <ul class="list-unstyled">
+        {% for servicio in servicios %}{% if servicio.precio_desde %}
+        {% for p in servicio.precios.all %}
+        <li>{{ servicio.nombre }} — <strong>Desde {{ p.precio|clp }}</strong></li>
+        {% endfor %}
+        {% endif %}{% endfor %}
+      </ul>
+    </div>
+
+    <!-- Contacto -->
+    <div class="text-center mt-5">
+      <p class="mb-1">📱 <strong>WhatsApp:</strong> +56 9 1234 5678</p>
+      <p class="mb-1">📍 Av. Concha y Toro 2730, 8150215 Puente Alto, Región Metropolitana</p>
+      <p class="text-muted">Síguenos en Instagram: <a href="https://www.instagram.com/_br1.exe/" target="_blank">@carwashmanantial</a></p>
+    </div>
+  </div>
+</section>
+{% endblock %}

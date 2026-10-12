@@ -1,0 +1,312 @@
+{% extends 'turnos/base.html' %}
+{% load formato %}
+
+{% block title %}Dashboard - Carwash{% endblock %}
+{% block active_dashboard %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+  .dash {
+    --surface: #fcfcfb;
+    --texto: #0b0b0b;
+    --texto-2: #52514e;
+    --texto-suave: #898781;
+    --borde: rgba(11, 11, 11, 0.10);
+    --serie-1: #2a78d6;
+    --sube: #006300;
+    --baja: #b3261e;
+  }
+  .dash .tarjeta {
+    background: var(--surface);
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    height: 100%;
+  }
+  .dash .tarjeta.apilada { height: auto; }
+  .dash .kpi-etiqueta { color: var(--texto-2); font-size: .875rem; margin-bottom: .25rem; }
+  .dash .kpi-valor { color: var(--texto); font-size: 1.75rem; font-weight: 600; line-height: 1.2; }
+  .dash .kpi-detalle { color: var(--texto-suave); font-size: .8125rem; margin-top: .25rem; }
+  .dash .sube { color: var(--sube); }
+  .dash .baja { color: var(--baja); }
+  .dash .grafico { position: relative; height: 260px; }
+  .dash .grafico-bajo { position: relative; height: 220px; }
+  .dash h2.seccion { font-size: 1.05rem; font-weight: 600; color: var(--texto); margin-bottom: .75rem; }
+  .dash details summary { color: var(--texto-2); font-size: .8125rem; cursor: pointer; margin-top: .5rem; }
+  .dash table { font-variant-numeric: tabular-nums; --bs-table-bg: transparent; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 dash">
+
+  <!-- Encabezado + filtro de período (uno solo, aplica a todo) -->
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div>
+      <h1 class="h3 fw-bold mb-1">Dashboard del negocio</h1>
+      <p class="text-muted mb-0">{{ inicio|date:"d/m/Y" }} – {{ hoy|date:"d/m/Y" }} · según la fecha del turno</p>
+    </div>
+    <div class="btn-group" role="group" aria-label="Período">
+      {% for valor, nombre in periodos.items %}
+      <a href="?periodo={{ valor }}" class="btn btn-sm {% if valor == dias %}btn-primary{% else %}btn-outline-primary{% endif %}"
+         {% if valor == dias %}aria-current="true"{% endif %}>{{ nombre }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if por_marcar %}
+  <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>⚠️ <strong>{{ por_marcar }}</strong> reserva{{ por_marcar|pluralize }} de días pasados sigue{{ por_marcar|pluralize:"n" }} como "Pendiente". Márcala{{ por_marcar|pluralize }} como completada o "no asistió" para que las métricas sean exactas.</span>
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'admin:turnos_reserva_changelist' %}?estado__exact=pendiente">Revisar en el admin</a>
+  </div>
+  {% endif %}
+
+  <!-- KPIs -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+      <div class="tarjeta">
+        <div class="kpi-etiqueta">Reservas</div>
+        <div class="kpi-valor">{{ kpis.reservas }}</div>
+        <div class="kpi-detalle">
+          {% if kpis.reservas_var is None %}sin período anterior para comparar
+          {% elif kpis.reservas_var >= 0 %}<span class="sube">▲ {{ kpis.reservas_var }}%</span> vs período anterior
+          {% else %}<span class="baja">▼ {{ kpis.reservas_var|absoluto }}%</span> vs período anterior{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="tarjeta">
+        <div class="kpi-etiqueta">Ingresos (completadas)</div>
+        <div class="kpi-valor">{{ kpis.ingresos|clp }}</div>
+        <div class="kpi-detalle">
+          {% if kpis.ingresos_var is None %}sin período anterior para comparar
+          {% elif kpis.ingresos_var >= 0 %}<span class="sube">▲ {{ kpis.ingresos_var }}%</span> vs período anterior
+          {% else %}<span class="baja">▼ {{ kpis.ingresos_var|absoluto }}%</span> vs período anterior{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="tarjeta">
+        <div class="kpi-etiqueta">Ticket promedio</div>
+        <div class="kpi-valor">{{ kpis.ticket|clp }}</div>
+        <div class="kpi-detalle">{{ kpis.por_cobrar|clp }} en reservas futuras pendientes</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="tarjeta">
+        <div class="kpi-etiqueta">Ocupación próximos 7 días</div>
+        <div class="kpi-valor">{% if kpis.ocupacion is None %}—{% else %}{{ kpis.ocupacion }}%{% endif %}</div>
+        <div class="kpi-detalle">
+          {% if kpis.total_proximos %}{{ kpis.ocupados_proximos }} de {{ kpis.total_proximos }} horarios reservados
+          {% else %}no hay horarios generados{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="tarjeta">
+        <div class="kpi-etiqueta">Tasa de cancelación</div>
+        <div class="kpi-valor">{% if kpis.cancelacion is None %}—{% else %}{{ kpis.cancelacion }}%{% endif %}</div>
+        <div class="kpi-detalle">{{ kpis.canceladas }} cancelada{{ kpis.canceladas|pluralize }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="tarjeta">
+        <div class="kpi-etiqueta">No se presentaron</div>
+        <div class="kpi-valor">{% if kpis.no_asistio_pct is None %}—{% else %}{{ kpis.no_asistio_pct }}%{% endif %}</div>
+        <div class="kpi-detalle">{{ kpis.no_asistio }} de los turnos ya realizados</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="tarjeta">
+        <div class="kpi-etiqueta">Clientes</div>
+        <div class="kpi-valor">{{ kpis.clientes }}</div>
+        <div class="kpi-detalle">{{ kpis.clientes_nuevos }} nuevo{{ kpis.clientes_nuevos|pluralize }} · {{ kpis.clientes_recurrentes }} recurrente{{ kpis.clientes_recurrentes|pluralize }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="tarjeta">
+        <div class="kpi-etiqueta">Completadas sin precio</div>
+        <div class="kpi-valor">{{ kpis.sin_precio }}</div>
+        <div class="kpi-detalle">reservas antiguas sin tamaño de vehículo; no suman a ingresos</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tendencia: dos gráficos separados (nunca doble eje) -->
+  <div class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="tarjeta">
+        <h2 class="seccion">Reservas {% if dias > 30 %}por semana{% else %}por día{% endif %}</h2>
+        <div class="grafico"><canvas id="g-reservas" role="img" aria-label="Reservas en el período"></canvas></div>
+        <details><summary>Ver tabla</summary>
+          <table class="table table-sm mt-2 mb-0"><thead><tr><th>Fecha</th><th class="text-end">Reservas</th></tr></thead><tbody>
+          {% for f in tendencia %}<tr><td>{{ f.etiqueta }}</td><td class="text-end">{{ f.reservas }}</td></tr>{% endfor %}
+          </tbody></table>
+        </details>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="tarjeta">
+        <h2 class="seccion">Ingresos {% if dias > 30 %}por semana{% else %}por día{% endif %}</h2>
+        <div class="grafico"><canvas id="g-ingresos" role="img" aria-label="Ingresos en el período"></canvas></div>
+        <details><summary>Ver tabla</summary>
+          <table class="table table-sm mt-2 mb-0"><thead><tr><th>Fecha</th><th class="text-end">Ingresos</th></tr></thead><tbody>
+          {% for f in tendencia %}<tr><td>{{ f.etiqueta }}</td><td class="text-end">{{ f.ingresos|clp }}</td></tr>{% endfor %}
+          </tbody></table>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- Servicios + demanda -->
+  <div class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="tarjeta">
+        <h2 class="seccion">Servicios más pedidos</h2>
+        {% if servicios %}
+        <div class="grafico"><canvas id="g-servicios" role="img" aria-label="Reservas por servicio"></canvas></div>
+        <details><summary>Ver tabla (con ingresos)</summary>
+          <table class="table table-sm mt-2 mb-0"><thead><tr><th>Servicio</th><th class="text-end">Reservas</th><th class="text-end">Ingresos</th></tr></thead><tbody>
+          {% for f in servicios %}<tr><td>{{ f.etiqueta }}</td><td class="text-end">{{ f.reservas }}</td><td class="text-end">{{ f.ingresos|clp }}</td></tr>{% endfor %}
+          </tbody></table>
+        </details>
+        {% else %}<p class="text-muted mb-0">Sin reservas en el período.</p>{% endif %}
+      </div>
+    </div>
+    <div class="col-lg-6 d-flex flex-column gap-3">
+      <div class="tarjeta apilada">
+        <h2 class="seccion">Demanda por día de la semana</h2>
+        <div class="grafico-bajo"><canvas id="g-dias" role="img" aria-label="Reservas por día de la semana"></canvas></div>
+        <details><summary>Ver tabla</summary>
+          <table class="table table-sm mt-2 mb-0"><tbody>
+          {% for f in por_dia %}<tr><td>{{ f.etiqueta }}</td><td class="text-end">{{ f.reservas }}</td></tr>{% endfor %}
+          </tbody></table>
+        </details>
+      </div>
+      <div class="tarjeta apilada">
+        <h2 class="seccion">Demanda por hora</h2>
+        {% if por_hora %}
+        <div class="grafico-bajo"><canvas id="g-horas" role="img" aria-label="Reservas por hora del día"></canvas></div>
+        <details><summary>Ver tabla</summary>
+          <table class="table table-sm mt-2 mb-0"><tbody>
+          {% for f in por_hora %}<tr><td>{{ f.etiqueta }}</td><td class="text-end">{{ f.reservas }}</td></tr>{% endfor %}
+          </tbody></table>
+        </details>
+        {% else %}<p class="text-muted mb-0">Sin reservas en el período.</p>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Operación: próximas reservas y clientes frecuentes -->
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="tarjeta">
+        <h2 class="seccion">Próximas reservas (hoy y mañana)</h2>
+        {% if proximas %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>Turno</th><th>Cliente</th><th>Servicio</th><th>Vehículo</th><th class="text-end">Precio</th></tr></thead>
+            <tbody>
+            {% for r in proximas %}
+              <tr>
+                <td>{% if r.horario.fecha == hoy %}Hoy{% else %}Mañana{% endif %} {{ r.horario.hora|time:"H:i" }}</td>
+                <td>{{ r.nombre }}<br><small class="text-muted">{{ r.telefono }}</small></td>
+                <td>{{ r.servicio_display }}</td>
+                <td>{{ r.Marca_modelo_auto|default:"—" }}</td>
+                <td class="text-end">{{ r.precio|clp }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}<p class="text-muted mb-0">No hay reservas pendientes para hoy ni mañana.</p>{% endif %}
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="tarjeta">
+        <h2 class="seccion">Clientes frecuentes</h2>
+        {% if frecuentes %}
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Cliente</th><th class="text-end">Visitas</th><th class="text-end">Total gastado</th></tr></thead>
+          <tbody>
+          {% for c in frecuentes %}
+            <tr><td>{{ c.nombre }}<br><small class="text-muted">{{ c.usuario__username }}</small></td><td class="text-end">{{ c.visitas }}</td><td class="text-end">{{ c.gastado|clp }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <p class="kpi-detalle mb-0 mt-2">Histórico, solo reservas completadas.</p>
+        {% else %}<p class="text-muted mb-0">Todavía no hay reservas completadas.</p>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ graficos|json_script:"datos-graficos" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    const datos = JSON.parse(document.getElementById("datos-graficos").textContent);
+    const css = getComputedStyle(document.querySelector(".dash"));
+    const color = (v) => css.getPropertyValue(v).trim();
+    const clp = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
+    const entero = new Intl.NumberFormat("es-CL");
+
+    Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+    Chart.defaults.color = "#898781";
+
+    // Una serie por gráfico: color único, sin leyenda (el título la nombra)
+    function barras(id, filas, campo, { horizontal = false, moneda = false } = {}) {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      const formato = (v) => (moneda ? clp.format(v) : entero.format(v));
+      const ejeValor = {
+        beginAtZero: true,
+        grid: { color: "#e1e0d9", drawTicks: false },
+        border: { display: false },
+        ticks: { precision: 0, padding: 6, callback: formato, maxTicksLimit: 5 },
+      };
+      const ejeCategoria = { grid: { display: false }, border: { color: "#c3c2b7" }, ticks: { autoSkip: true, maxRotation: 0 } };
+      new Chart(canvas, {
+        type: "bar",
+        data: {
+          labels: filas.map((f) => f.etiqueta),
+          datasets: [{
+            data: filas.map((f) => f[campo]),
+            backgroundColor: color("--serie-1"),
+            borderRadius: 4,
+            borderSkipped: "start",
+            categoryPercentage: 0.85,
+            barPercentage: 0.9,
+            maxBarThickness: 36,
+          }],
+        },
+        options: {
+          indexAxis: horizontal ? "y" : "x",
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: "#0b0b0b",
+              padding: 10,
+              displayColors: false,
+              callbacks: { label: (ctx) => formato(horizontal ? ctx.parsed.x : ctx.parsed.y) },
+            },
+          },
+          scales: horizontal ? { x: ejeValor, y: ejeCategoria } : { x: ejeCategoria, y: ejeValor },
+        },
+      });
+    }
+
+    barras("g-reservas", datos.tendencia, "reservas");
+    barras("g-ingresos", datos.tendencia, "ingresos", { moneda: true });
+    barras("g-servicios", datos.servicios, "reservas", { horizontal: true });
+    barras("g-dias", datos.por_dia, "reservas");
+    barras("g-horas", datos.por_hora, "reservas");
+  })();
+</script>
+{% endblock %}

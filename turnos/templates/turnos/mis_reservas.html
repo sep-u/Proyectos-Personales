@@ -1,0 +1,56 @@
+{% extends 'turnos/base.html' %}
+{% load formato %}
+{% block title %}Mis Reservas{% endblock %}
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">Mis Reservas</h2>
+
+  {% if reservas %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Servicio</th>
+          <th>Precio</th>
+          <th>Estado</th>
+          <th>Fecha</th>
+          <th>Hora</th>
+          <th>telefono</th>
+          <th>Vehiculo</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for reserva in reservas %}
+        <tr>
+          <td>{{ reserva.servicio_display }}</td>
+          <td>{{ reserva.precio|clp }}</td>
+          <td>
+            {% if reserva.estado == "pendiente" %}<span class="badge text-bg-primary">
+            {% elif reserva.estado == "completada" %}<span class="badge text-bg-success">
+            {% elif reserva.estado == "cancelada" %}<span class="badge text-bg-secondary">
+            {% else %}<span class="badge text-bg-warning">{% endif %}{{ reserva.get_estado_display }}</span>
+          </td>
+          <td>{{ reserva.horario.fecha }}</td>
+          <td>{{ reserva.horario.hora }}</td>
+          <td>{{ reserva.telefono }}</td>
+          <td>{{ reserva.Marca_modelo_auto }}</td>
+          <td>
+            {% if reserva.se_puede_cancelar %}
+            <form method="post" action="{% url 'cancelar_reserva' reserva.id %}"
+                  onsubmit="return confirm('¿Seguro que deseas cancelar esta reserva?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-center">No tienes reservas aún.</p>
+  {% endif %}
+</div>
+{% endblock %}

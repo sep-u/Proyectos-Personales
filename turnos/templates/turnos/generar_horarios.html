@@ -1,0 +1,120 @@
+{% extends 'turnos/base.html' %}
+{% load static %}
+
+{% block title %}Generar horarios - Carwash{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">Generar horarios disponibles</h2>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} mx-auto" style="max-width: 600px;">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Formulario para generar horarios -->
+  <div class="card shadow-sm p-4 mx-auto mb-5" style="max-width: 600px;">
+    <h5 class="text-center mb-3">Definir rango de horarios</h5>
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="mb-3">
+        <label for="{{ form.fecha_inicio.id_for_label }}" class="form-label">{{ form.fecha_inicio.label }}</label>
+        {{ form.fecha_inicio }}
+      </div>
+
+      <div class="mb-3">
+        <label for="{{ form.fecha_fin.id_for_label }}" class="form-label">{{ form.fecha_fin.label }}</label>
+        {{ form.fecha_fin }}
+      </div>
+
+      <div class="row">
+        <div class="col mb-3">
+          <label for="{{ form.hora_inicio.id_for_label }}" class="form-label">{{ form.hora_inicio.label }}</label>
+          {{ form.hora_inicio }}
+        </div>
+        <div class="col mb-3">
+          <label for="{{ form.hora_fin.id_for_label }}" class="form-label">{{ form.hora_fin.label }}</label>
+          {{ form.hora_fin }}
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="{{ form.intervalo_minutos.id_for_label }}" class="form-label">{{ form.intervalo_minutos.label }}</label>
+        {{ form.intervalo_minutos }}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label d-block">{{ form.dias_semana.label }}</label>
+        {{ form.dias_semana }}
+      </div>
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary w-100 mt-3">Generar horarios</button>
+    </form>
+  </div>
+
+  <!-- Tabla de horarios generados -->
+  <div class="card shadow-sm p-4 mx-auto" style="max-width: 700px;">
+    <h5 class="text-center mb-3">Últimos horarios generados</h5>
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Hora</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in horarios %}
+        <tr>
+          <td>{{ h.fecha }}</td>
+          <td>{{ h.hora }}</td>
+          <td>
+            {% if h.disponible %}
+              <span class="badge bg-success">Disponible</span>
+            {% else %}
+              <span class="badge bg-secondary">Ocupado</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3" class="text-center">Aún no hay horarios generados.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    flatpickr(".flatpickr-fecha", {
+      dateFormat: "Y-m-d",
+      locale: "es",
+      disable: [
+        function (date) {
+          return date.getDay() === 0; // domingo: no se trabaja
+        }
+      ]
+    });
+  });
+</script>
+{% endblock %}

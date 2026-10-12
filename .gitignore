@@ -1,0 +1,30 @@
+# Secretos (contraseñas, claves)
+.env
+*.env
+
+# Bases de datos y respaldos
+db.sqlite3
+*.sqlite3
+*.dump
+backup*
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Archivos generados / herramientas locales
+graphify-out/
+staticfiles/
+media/
+
+# Configuración de Claude Code
+CLAUDE.md
+.claude/
+
+# Editor / sistema
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

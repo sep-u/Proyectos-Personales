@@ -1,0 +1,31 @@
+.hero-section {
+  position: relative;
+}
+
+.hero-section .overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+}
+
+.services .card-img-top {
+  height: 200px;
+  object-fit: cover;
+}
+
+.locations .card-title {
+  font-size: 1.25rem;
+}
+
+.footer {
+  font-size: 0.9rem;
+}
+
+.carousel-inner img {
+  height: 350px;
+  object-fit: cover;
+  border-radius: 10px;
+}

@@ -1,0 +1,83 @@
+{% extends 'turnos/base.html' %}
+{% load static formato %}
+
+
+{% block title %}Reservas - Carwash{% endblock %}
+{% block active_reservas %}active{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">Reserva tu turno</h2>
+
+  <!-- Paso 1: Selección de horario disponible -->
+  <div id="step1">
+    <div class="card shadow-sm p-4 mx-auto" style="max-width: 500px;">
+      <h5 class="text-center mb-3">Selecciona un horario disponible</h5>
+      <form id="select-date-form">
+        <label for="horario" class="form-label">Fecha y hora</label>
+        <select id="horario" class="form-select" required>
+          <option value="">Selecciona...</option>
+          {% for h in horarios_disponibles %}
+          <option value="{{ h.id }}">{{ h.fecha }} - {{ h.hora }}</option>
+          {% endfor %}
+        </select>
+
+        <button type="button" id="nextBtn" class="btn btn-primary w-100 mt-4">Continuar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Paso 2: Formulario (oculto al inicio) -->
+  <div id="step2" class="mt-5" style="display: none;">
+    <div class="card shadow-sm p-4 mx-auto" style="max-width: 500px;">
+      <h5 class="text-center mb-3">Completa tus datos</h5>
+      <form method="POST" id="reservaForm">
+        {% csrf_token %}
+        <input type="hidden" name="horario" id="formHorario">
+
+        <div class="mb-3">
+          <label class="form-label">Nombre</label>
+          <input type="text" name="nombre" class="form-control" value="{{ user.first_name }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Apellido</label>
+          <input type="text" name="apellido" class="form-control" value="{{ user.last_name }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ user.email }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Teléfono</label>
+          <input type="text" name="telefono" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Marca y modelo Vehiculo</label>
+          <input type="text" name="marca_modelo_auto" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Tipo de servicio</label>
+          <select name="precio_servicio" class="form-select" required>
+            <option value="">Selecciona...</option>
+            {% for servicio in servicios %}
+            <optgroup label="{{ servicio.nombre }}">
+              {% for p in servicio.precios.all %}
+              <option value="{{ p.id }}">
+                {% if p.tamano_vehiculo == "unico" %}{{ servicio.nombre }}{% else %}{{ p.get_tamano_vehiculo_display }}{% endif %}
+                — {% if servicio.precio_desde %}desde {% endif %}{{ p.precio|clp }}
+              </option>
+              {% endfor %}
+            </optgroup>
+            {% endfor %}
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-success w-100">Confirmar Reserva</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Enlace al JS externo -->
+<script src="{% static 'js/reservas.js' %}"></script>
+{% endblock %}

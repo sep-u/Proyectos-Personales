@@ -1,0 +1,11 @@
+{% extends 'turnos/base.html' %}
+{% block content %}
+<div class="container mt-5" style="max-width: 500px;">
+  <h2>Registro</h2>
+  <form method="POST">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn btn-primary w-100">Registrarse</button>
+  </form>
+</div>
+{% endblock %}
