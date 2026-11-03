@@ -1,0 +1,70 @@
+/* Estilos del panel de administración (no afectan al sitio público) */
+.panel {
+  --fondo: #f4f5f7;
+  --surface: #fcfcfb;
+  --texto: #0b0b0b;
+  --texto-2: #52514e;
+  --texto-suave: #898781;
+  --borde: rgba(11, 11, 11, 0.10);
+  --lateral: #1d2433;
+  background: var(--fondo);
+  color: var(--texto);
+}
+
+.panel-layout { display: flex; min-height: 100vh; }
+
+.panel-sidebar {
+  --bs-offcanvas-width: 240px;
+  --bs-offcanvas-bg: var(--lateral);
+  --bs-offcanvas-color: #fff;
+  background: var(--lateral);
+  color: #fff;
+}
+@media (min-width: 992px) {
+  .panel-sidebar { width: 240px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; background-color: var(--lateral) !important;}
+  .panel-sidebar .offcanvas-body { padding: 1.25rem 1rem; }
+}
+.panel-sidebar .nav-link { color: rgba(255, 255, 255, .75); border-radius: 8px; padding: .5rem .75rem; }
+.panel-sidebar .nav-link:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+.panel-sidebar .nav-link.active { color: #fff; background: #2a78d6; }
+.panel-marca { display: flex; align-items: center; gap: .6rem; color: #fff; text-decoration: none; font-weight: 600; margin-bottom: 1.5rem; }
+.panel-marca img { border-radius: 6px; object-fit: cover; }
+
+.panel-topbar { display: flex; align-items: center; gap: .75rem; padding: .6rem 1rem; background: var(--lateral); color: #fff; }
+
+.panel-main { flex: 1; min-width: 0; padding: 1.5rem; }
+@media (max-width: 575px) { .panel-main { padding: 1rem; } }
+
+.panel .tarjeta {
+  background: var(--surface);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+}
+.panel h1 { font-size: 1.5rem; font-weight: 700; }
+.panel .subtitulo { color: var(--texto-2); }
+.panel .chico { color: var(--texto-suave); font-size: .8125rem; }
+.panel table { font-variant-numeric: tabular-nums; --bs-table-bg: transparent; }
+.panel .table > :not(caption) > * > * { padding: .6rem .5rem; }
+
+/* Colores de estado (iguales en toda la app del panel) */
+.estado-pendiente  { background: #2a78d6; }
+.estado-completada { background: #1a7f37; }
+.estado-cancelada  { background: #8a8f98; }
+.estado-no_asistio { background: #c26a00; }
+
+/* Agenda */
+.agenda-fila.libre td { color: var(--texto-suave); }
+.agenda-hora { font-weight: 600; font-size: 1.05rem; width: 4.5rem; }
+.resumen-dia .valor { font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
+.resumen-dia .etiqueta { color: var(--texto-2); font-size: .8125rem; }
+
+/* Barra de acciones masivas en la lista de reservas */
+.barra-masiva { position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--borde); padding: .75rem 0; }
+
+/* Mini calendario de los próximos 14 días en Horarios */
+.dia-chip { border: 1px solid var(--borde); border-radius: 10px; padding: .5rem .6rem; background: var(--surface); text-decoration: none; color: inherit; display: block; }
+.dia-chip:hover { border-color: #2a78d6; }
+.dia-chip.vacio { background: #fff4e5; }
+.dia-chip .barra { height: 4px; background: #e1e0d9; border-radius: 2px; overflow: hidden; margin-top: .35rem; }
+.dia-chip .barra span { display: block; height: 100%; background: #2a78d6; }

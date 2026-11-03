@@ -1,0 +1,102 @@
+{% extends 'turnos/panel/base_panel.html' %}
+{% load formato %}
+
+{% block title %}Agenda{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+  <div>
+    <h1 class="mb-1">Agenda · {{ nombre_dia }} {{ dia|date:"d/m/Y" }}</h1>
+    <p class="subtitulo mb-0">{% if dia == hoy %}Hoy{% elif dia < hoy %}Día pasado{% else %}Próximo día{% endif %}</p>
+  </div>
+  <!-- Navegación entre días: es un formulario GET, así la fecha queda en la URL (?fecha=...) -->
+  <form method="get" class="d-flex gap-2 align-items-center">
+    <a class="btn btn-outline-secondary btn-sm" href="?fecha={{ anterior|date:'Y-m-d' }}" aria-label="Día anterior">‹</a>
+    {% if dia != hoy %}<a class="btn btn-outline-primary btn-sm" href="?fecha={{ hoy|date:'Y-m-d' }}">Hoy</a>{% endif %}
+    <a class="btn btn-outline-secondary btn-sm" href="?fecha={{ siguiente|date:'Y-m-d' }}" aria-label="Día siguiente">›</a>
+    <input type="date" name="fecha" value="{{ dia|date:'Y-m-d' }}" class="form-control form-control-sm" style="width: auto" onchange="this.form.submit()" aria-label="Ir a fecha">
+  </form>
+</div>
+
+<div class="row g-3 mb-3 resumen-dia">
+  <div class="col-6 col-md"><div class="tarjeta"><div class="valor">{{ resumen.pendientes }}</div><div class="etiqueta">Pendientes</div></div></div>
+  <div class="col-6 col-md"><div class="tarjeta"><div class="valor">{{ resumen.completadas }}</div><div class="etiqueta">Completadas</div></div></div>
+  <div class="col-6 col-md"><div class="tarjeta"><div class="valor">{{ resumen.no_asistio }}</div><div class="etiqueta">No asistieron</div></div></div>
+  <div class="col-6 col-md"><div class="tarjeta"><div class="valor">{{ resumen.libres }}</div><div class="etiqueta">Horarios libres</div></div></div>
+  <div class="col-12 col-md"><div class="tarjeta"><div class="valor">{{ resumen.ingresos|clp }}</div><div class="etiqueta">Ingresos del día (completadas)</div></div></div>
+</div>
+
+<div class="tarjeta">
+  {% if filas %}
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr><th>Hora</th><th>Cliente</th><th>Servicio</th><th>Vehículo</th><th>Estado</th><th class="text-end">Acciones</th></tr>
+      </thead>
+      <tbody>
+      {% for f in filas %}
+        {% with r=f.reserva %}
+        <tr class="agenda-fila {% if not r %}libre{% endif %}">
+          <td class="agenda-hora">{{ f.horario.hora|time:"H:i" }}</td>
+          {% if r %}
+          <td>
+            <a href="{% url 'panel_reserva' r.id %}" class="fw-semibold text-decoration-none">{{ r.nombre }}</a><br>
+            <a href="tel:{{ r.telefono }}" class="chico text-decoration-none">{{ r.telefono }}</a>
+          </td>
+          <td>{{ r.servicio_display }}<br><span class="chico">{{ r.precio|clp }}</span></td>
+          <td>{{ r.Marca_modelo_auto|default:"—" }}</td>
+          <td>{% include 'turnos/panel/_estado.html' with r=r %}</td>
+          <td class="text-end">
+            {% if r.estado == 'pendiente' %}
+            <!-- Un solo form, varios botones: el botón presionado envía su propio name/value -->
+            <form method="post" action="{% url 'panel_cambiar_estado' %}" class="d-inline-flex flex-wrap gap-1 justify-content-end">
+              {% csrf_token %}
+              <input type="hidden" name="ids" value="{{ r.id }}">
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              {% if dia <= hoy %}
+              <button class="btn btn-sm btn-success" name="estado" value="completada">✓ Completada</button>
+              <button class="btn btn-sm btn-outline-warning" name="estado" value="no_asistio">No asistió</button>
+              {% endif %}
+              <button class="btn btn-sm btn-outline-danger" name="estado" value="cancelada"
+                      onclick="return confirm('¿Cancelar la reserva de {{ r.nombre|escapejs }}? El horario quedará libre.');">Cancelar</button>
+            </form>
+            {% else %}
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'panel_reserva' r.id %}">Ver</a>
+            {% endif %}
+          </td>
+          {% else %}
+          <td colspan="4">
+            Libre{% if f.canceladas %} <span class="chico">· {{ f.canceladas }} cancelada{{ f.canceladas|pluralize }}</span>{% endif %}
+          </td>
+          <td class="text-end">
+            {% if f.borrable %}
+            <form method="post" action="{% url 'panel_eliminar_horario' f.horario.id %}" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button class="btn btn-sm btn-link text-danger p-0" title="Quitar este horario para que nadie lo reserve">Quitar horario</button>
+            </form>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endwith %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if hay_borrables and dia >= hoy %}
+  <form method="post" action="{% url 'panel_eliminar_libres' %}" class="mt-3 text-end"
+        onsubmit="return confirm('¿Quitar todos los horarios libres de este día? Las reservas existentes no se tocan.');">
+    {% csrf_token %}
+    <input type="hidden" name="fecha_inicio" value="{{ dia|date:'Y-m-d' }}">
+    <input type="hidden" name="fecha_fin" value="{{ dia|date:'Y-m-d' }}">
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button class="btn btn-sm btn-outline-danger">Cerrar este día (quitar horarios libres)</button>
+  </form>
+  {% endif %}
+  {% else %}
+  <p class="mb-2">No hay horarios generados para este día.</p>
+  <a class="btn btn-primary btn-sm" href="{% url 'generar_horarios' %}">Generar horarios</a>
+  {% endif %}
+</div>
+{% endblock %}

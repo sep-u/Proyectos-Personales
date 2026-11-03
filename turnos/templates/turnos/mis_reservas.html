@@ -31,17 +31,26 @@
             {% elif reserva.estado == "cancelada" %}<span class="badge text-bg-secondary">
             {% else %}<span class="badge text-bg-warning">{% endif %}{{ reserva.get_estado_display }}</span>
           </td>
-          <td>{{ reserva.horario.fecha }}</td>
-          <td>{{ reserva.horario.hora }}</td>
+          <td>{{ reserva.horario.fecha|date:"d/m/Y" }}</td>
+          <td>{{ reserva.horario.hora|time:"H:i" }}</td>
           <td>{{ reserva.telefono }}</td>
           <td>{{ reserva.Marca_modelo_auto }}</td>
           <td>
-            {% if reserva.se_puede_cancelar %}
-            <form method="post" action="{% url 'cancelar_reserva' reserva.id %}"
-                  onsubmit="return confirm('¿Seguro que deseas cancelar esta reserva?');">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar</button>
-            </form>
+            {% if reserva.se_puede_modificar or reserva.se_puede_cancelar %}
+            <div class="d-flex gap-2">
+              {% if reserva.se_puede_modificar %}
+              <a href="{% url 'modificar_reserva' reserva.id %}" class="btn btn-outline-primary btn-sm">Modificar</a>
+              {% endif %}
+              {% if reserva.se_puede_cancelar %}
+              <form method="post" action="{% url 'cancelar_reserva' reserva.id %}"
+                    onsubmit="return confirm('¿Seguro que deseas cancelar esta reserva?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar</button>
+              </form>
+              {% endif %}
+            </div>
+            {% elif reserva.estado == "pendiente" %}
+            <small class="text-muted">Ya no se puede modificar ni cancelar (requiere {{ reserva.HORAS_ANTICIPACION }} h de anticipación)</small>
             {% endif %}
           </td>
         </tr>

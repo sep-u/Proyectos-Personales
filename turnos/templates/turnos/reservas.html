@@ -18,7 +18,7 @@
         <select id="horario" class="form-select" required>
           <option value="">Selecciona...</option>
           {% for h in horarios_disponibles %}
-          <option value="{{ h.id }}">{{ h.fecha }} - {{ h.hora }}</option>
+          <option value="{{ h.id }}">{{ h.fecha|date:"l d/m/Y" }} - {{ h.hora|time:"H:i" }}</option>
           {% endfor %}
         </select>
 

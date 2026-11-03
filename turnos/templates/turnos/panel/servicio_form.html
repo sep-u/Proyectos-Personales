@@ -1,0 +1,61 @@
+{% extends 'turnos/panel/base_panel.html' %}
+
+{% block title %}{% if servicio.pk %}Editar {{ servicio.nombre }}{% else %}Nuevo servicio{% endif %}{% endblock %}
+
+{% block content %}
+<a href="{% url 'panel_servicios' %}" class="chico text-decoration-none">← Volver a servicios</a>
+<h1 class="mt-1 mb-3">{% if servicio.pk %}Editar "{{ servicio.nombre }}"{% else %}Nuevo servicio{% endif %}</h1>
+
+<form method="post" class="row g-3">
+  {% csrf_token %}
+  <div class="col-lg-6">
+    <div class="tarjeta">
+      <h2 class="h6 fw-semibold">Datos del servicio</h2>
+      {{ form.non_field_errors }}
+      {% for campo in form %}
+        {% if campo.field.widget.input_type == 'checkbox' %}
+        <div class="form-check mb-2">
+          {{ campo }} <label class="form-check-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+        </div>
+        {% else %}
+        <div class="mb-2">
+          <label class="form-label small mb-1" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% for e in campo.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="tarjeta">
+      <h2 class="h6 fw-semibold">Precios por tamaño de vehículo</h2>
+      <p class="chico">Si el precio no depende del tamaño, usa una sola fila con "Precio único". La fila vacía sirve para agregar un precio nuevo.</p>
+      {# management_form: campos ocultos que le dicen a Django cuántas filas tiene el formset #}
+      {{ formset.management_form }}
+      {% for e in formset.non_form_errors %}<div class="alert alert-danger py-1">{{ e }}</div>{% endfor %}
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Tamaño</th><th>Precio (CLP)</th><th class="text-center">Quitar</th></tr></thead>
+        <tbody>
+        {% for f in formset %}
+          <tr>
+            <td>{{ f.id }}{{ f.tamano_vehiculo }}</td>
+            <td>{{ f.precio }}</td>
+            <td class="text-center">{% if f.instance.pk %}{{ f.DELETE }}{% endif %}</td>
+          </tr>
+          {% if f.errors %}
+          <tr><td colspan="3" class="text-danger small">{% for campo, errores in f.errors.items %}{{ errores|join:", " }} {% endfor %}</td></tr>
+          {% endif %}
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <button class="btn btn-primary">Guardar</button>
+    <a class="btn btn-outline-secondary" href="{% url 'panel_servicios' %}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

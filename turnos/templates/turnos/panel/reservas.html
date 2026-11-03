@@ -1,0 +1,133 @@
+{% extends 'turnos/panel/base_panel.html' %}
+{% load formato %}
+
+{% block title %}Reservas{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">Reservas</h1>
+
+<!-- Vistas rápidas -->
+<ul class="nav nav-pills mb-3 gap-1">
+  <li class="nav-item"><a class="nav-link {% if vista == 'proximas' %}active{% endif %}" href="?vista=proximas">Próximas</a></li>
+  <li class="nav-item">
+    <a class="nav-link {% if vista == 'por_marcar' %}active{% endif %}" href="?vista=por_marcar">
+      Por marcar {% if conteo_por_marcar %}<span class="badge text-bg-warning">{{ conteo_por_marcar }}</span>{% endif %}
+    </a>
+  </li>
+  <li class="nav-item"><a class="nav-link {% if vista == 'todas' %}active{% endif %}" href="?vista=todas">Todas</a></li>
+</ul>
+{% if vista == 'por_marcar' %}
+<p class="subtitulo">Turnos de días pasados que siguen como "Pendiente". Márcalos para que el dashboard tenga números exactos.</p>
+{% endif %}
+
+<!-- Filtros (GET: quedan en la URL, se pueden guardar como marcador) -->
+<form method="get" class="tarjeta mb-3">
+  <input type="hidden" name="vista" value="{{ vista }}">
+  <div class="row g-2 align-items-end">
+    <div class="col-12 col-md-4">
+      <label class="form-label small mb-1" for="q">Buscar</label>
+      <input type="search" id="q" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Nombre, email, teléfono o vehículo">
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1" for="estado">Estado</label>
+      <select id="estado" name="estado" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        {% for valor, etiqueta in estados %}<option value="{{ valor }}" {% if valor == estado %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1" for="servicio">Servicio</label>
+      <select id="servicio" name="servicio" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        {% for s in servicios %}<option value="{{ s.id }}" {% if s.id|stringformat:"s" == servicio_id %}selected{% endif %}>{{ s.nombre }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-1">
+      <label class="form-label small mb-1" for="desde">Desde</label>
+      <input type="date" id="desde" name="desde" value="{{ desde|date:'Y-m-d' }}" class="form-control form-control-sm">
+    </div>
+    <div class="col-6 col-md-1">
+      <label class="form-label small mb-1" for="hasta">Hasta</label>
+      <input type="date" id="hasta" name="hasta" value="{{ hasta|date:'Y-m-d' }}" class="form-control form-control-sm">
+    </div>
+    <div class="col-12 col-md-2 d-flex gap-2">
+      <button class="btn btn-primary btn-sm flex-fill">Filtrar</button>
+      <a class="btn btn-outline-secondary btn-sm" href="?vista={{ vista }}">Limpiar</a>
+    </div>
+  </div>
+</form>
+
+<div class="tarjeta">
+  <p class="chico mb-2">{{ pagina.paginator.count }} reserva{{ pagina.paginator.count|pluralize }}</p>
+  {% if pagina.object_list %}
+  <form method="post" action="{% url 'panel_cambiar_estado' %}" id="form-masivo">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th><input type="checkbox" class="form-check-input" id="marcar-todas" aria-label="Seleccionar todas"></th>
+            <th>Turno</th><th>Cliente</th><th>Servicio</th><th>Vehículo</th><th class="text-end">Precio</th><th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in pagina %}
+          <tr>
+            <td><input type="checkbox" class="form-check-input fila" name="ids" value="{{ r.id }}" aria-label="Seleccionar reserva de {{ r.nombre }}"></td>
+            <td class="text-nowrap">{{ r.horario.fecha|date:"D d/m/Y" }}<br><span class="chico">{{ r.horario.hora|time:"H:i" }}</span></td>
+            <td><a href="{% url 'panel_reserva' r.id %}" class="fw-semibold text-decoration-none">{{ r.nombre }}</a><br><span class="chico">{{ r.telefono }}</span></td>
+            <td>{{ r.servicio_display }}</td>
+            <td>{{ r.Marca_modelo_auto|default:"—" }}</td>
+            <td class="text-end">{{ r.precio|clp }}</td>
+            <td>{% include 'turnos/panel/_estado.html' with r=r %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="barra-masiva d-flex flex-wrap gap-2 align-items-center">
+      <span class="chico me-2"><span id="contador">0</span> seleccionada(s):</span>
+      <button class="btn btn-sm btn-success" name="estado" value="completada">Marcar completadas</button>
+      <button class="btn btn-sm btn-outline-warning" name="estado" value="no_asistio">Marcar "no asistió"</button>
+      <button class="btn btn-sm btn-outline-secondary" name="estado" value="pendiente">Volver a pendiente</button>
+      <button class="btn btn-sm btn-outline-danger" name="estado" value="cancelada"
+              onclick="return confirm('¿Cancelar las reservas seleccionadas? Sus horarios quedarán libres.');">Cancelar</button>
+    </div>
+  </form>
+
+  {% if pagina.has_other_pages %}
+  <nav class="mt-3" aria-label="Páginas">
+    <ul class="pagination pagination-sm mb-0">
+      {% if pagina.has_previous %}<li class="page-item"><a class="page-link" href="?{{ filtros }}&page={{ pagina.previous_page_number }}">Anterior</a></li>{% endif %}
+      <li class="page-item disabled"><span class="page-link">Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span></li>
+      {% if pagina.has_next %}<li class="page-item"><a class="page-link" href="?{{ filtros }}&page={{ pagina.next_page_number }}">Siguiente</a></li>{% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+  {% else %}
+  <p class="mb-0">No hay reservas con estos filtros.</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Checkbox "seleccionar todas" + contador de seleccionadas
+  (function () {
+    const todas = document.getElementById("marcar-todas");
+    const filas = document.querySelectorAll("input.fila");
+    const contador = document.getElementById("contador");
+    if (!todas) return;
+    const actualizar = () => {
+      const n = [...filas].filter((c) => c.checked).length;
+      contador.textContent = n;
+      todas.checked = n > 0 && n === filas.length;
+      todas.indeterminate = n > 0 && n < filas.length;
+    };
+    todas.addEventListener("change", () => { filas.forEach((c) => (c.checked = todas.checked)); actualizar(); });
+    filas.forEach((c) => c.addEventListener("change", actualizar));
+  })();
+</script>
+{% endblock %}

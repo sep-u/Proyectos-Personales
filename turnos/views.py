@@ -7,14 +7,13 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.http import require_POST
-from .forms import RegistroForm, LoginForm, GenerarHorariosForm
+from .forms import RegistroForm, LoginForm
 from .models import Reserva
 from django.shortcuts import get_object_or_404, redirect
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from .models import Reserva, HorarioDisponible, PrecioServicio, Servicio
-from . import metricas
 # Create your views here.
 
 
@@ -48,7 +47,7 @@ def reservas(request):
             return redirect("reservas")
 
         # Buscamos el horario y verificamos que siga disponible
-        horario = get_object_or_404(HorarioDisponible, id=horario_id, disponible=True)
+        horario = get_object_or_404(HorarioDisponible, id=horario_id, disponible=True, fecha__gte=timezone.localdate())
         precio_servicio = get_object_or_404(
             PrecioServicio.objects.select_related("servicio"), id=precio_servicio_id, servicio__activo=True
         )
@@ -95,7 +94,10 @@ Equipo CarWash
         return redirect("mis_reservas")
 
      # Para el GET: le pasamos al template solo los horarios disponibles
-    horarios_disponibles = HorarioDisponible.objects.filter(disponible=True).order_by('fecha', 'hora')
+    # fecha__gte: un horario pasado puede quedar "disponible" si se canceló su reserva
+    horarios_disponibles = HorarioDisponible.objects.filter(
+        disponible=True, fecha__gte=timezone.localdate()
+    ).order_by('fecha', 'hora')
     servicios = Servicio.objects.filter(activo=True).prefetch_related("precios")
     return render(request, "turnos/reservas.html", {
         "horarios_disponibles": horarios_disponibles,
@@ -108,13 +110,52 @@ Equipo CarWash
 def cancelar_reserva(request, reserva_id):
     reserva = get_object_or_404(Reserva, id=reserva_id, usuario=request.user)
     if not reserva.se_puede_cancelar:
-        messages.error(request, "Esta reserva ya no se puede cancelar.")
+        messages.error(request, f"Las reservas solo se pueden cancelar con al menos {Reserva.HORAS_ANTICIPACION} horas de anticipación.")
         return redirect("mis_reservas")
 
     # No se borra: se marca como cancelada para conservar el historial del dashboard
     reserva.cancelar()
     messages.success(request, "La reserva fue cancelada correctamente.")
     return redirect("mis_reservas")
+
+
+@login_required
+def modificar_reserva(request, reserva_id):
+    # usuario=request.user: un cliente solo puede modificar SUS reservas, aunque cambie el id en la URL
+    reserva = get_object_or_404(Reserva.objects.select_related("horario"), id=reserva_id, usuario=request.user)
+    if not reserva.se_puede_modificar:
+        messages.error(request, f"Las reservas solo se pueden modificar con al menos {Reserva.HORAS_ANTICIPACION} horas de anticipación.")
+        return redirect("mis_reservas")
+
+    if request.method == "POST":
+        nuevo = HorarioDisponible.objects.filter(id=request.POST.get("horario")).first()
+        if nuevo is None or nuevo.inicio <= timezone.now():
+            messages.error(request, "Elige un horario válido.")
+            return redirect("modificar_reserva", reserva_id=reserva.id)
+        if not reserva.reprogramar(nuevo):
+            messages.error(request, "Ese horario acaba de ser tomado por otra persona. Elige otro.")
+            return redirect("modificar_reserva", reserva_id=reserva.id)
+
+        try:
+            send_mail(
+                "Cambio de reserva - CarWash",
+                f"Hola {reserva.nombre},\n\nTu reserva fue cambiada a:\n\n"
+                f"📅 Fecha: {nuevo.fecha:%d/%m/%Y}\n⏰ Hora: {nuevo.hora:%H:%M}\n🧽 Servicio: {reserva.servicio_display}\n\n"
+                "Saludos,\nEquipo CarWash",
+                settings.DEFAULT_FROM_EMAIL, [reserva.email],
+            )
+        except Exception as e:
+            print("❌ Error al enviar el correo:", e)
+
+        messages.success(request, f"Tu reserva quedó para el {nuevo.fecha:%d/%m/%Y} a las {nuevo.hora:%H:%M}.")
+        return redirect("mis_reservas")
+
+    # Solo horarios libres que todavía no pasan (hoy puede tener horas que ya pasaron)
+    ahora = timezone.localtime()
+    horarios = HorarioDisponible.objects.filter(disponible=True, fecha__gte=ahora.date()).exclude(
+        fecha=ahora.date(), hora__lte=ahora.time()
+    ).order_by("fecha", "hora")
+    return render(request, "turnos/modificar_reserva.html", {"reserva": reserva, "horarios": horarios})
 
 
 @login_required
@@ -179,64 +220,3 @@ def login_user(request):
 def logout_user(request):
     logout(request)
     return redirect("home")
-
-
-@user_passes_test(lambda u: u.is_staff, login_url='login')
-def generar_horarios(request):
-    limpiar_horarios_vencidos()
-    if request.method == "POST":
-        form = GenerarHorariosForm(request.POST)
-        if form.is_valid():
-            fecha_inicio = form.cleaned_data["fecha_inicio"]
-            fecha_fin = form.cleaned_data["fecha_fin"]
-            hora_inicio = form.cleaned_data["hora_inicio"]
-            hora_fin = form.cleaned_data["hora_fin"]
-            intervalo_minutos = form.cleaned_data["intervalo_minutos"]
-            dias_semana = {int(d) for d in form.cleaned_data["dias_semana"]}
-
-            creados = 0
-            fecha = fecha_inicio
-            while fecha <= fecha_fin:
-                if fecha.weekday() in dias_semana:
-                    hora_actual = datetime.combine(fecha, hora_inicio)
-                    limite = datetime.combine(fecha, hora_fin)
-                    while hora_actual < limite:
-                        _, created = HorarioDisponible.objects.get_or_create(
-                            fecha=fecha,
-                            hora=hora_actual.time(),
-                        )
-                        if created:
-                            creados += 1
-                        hora_actual += timedelta(minutes=intervalo_minutos)
-                fecha += timedelta(days=1)
-
-            messages.success(request, f"Se generaron {creados} horarios nuevos.")
-            return redirect("generar_horarios")
-    else:
-        form = GenerarHorariosForm()
-
-    hace_una_semana = timezone.localdate() - timedelta(days=7)
-    horarios = HorarioDisponible.objects.filter(
-        fecha__gte=hace_una_semana
-    ).order_by('-fecha', '-hora')[:50]
-    return render(request, "turnos/generar_horarios.html", {"form": form, "horarios": horarios})
-
-@user_passes_test(lambda u: u.is_staff, login_url='login')
-def dashboard_staff(request):
-    try:
-        dias = int(request.GET.get("periodo", 30))
-    except ValueError:
-        dias = 30
-    if dias not in metricas.PERIODOS:
-        dias = 30
-
-    datos = metricas.calcular(dias)
-    datos["dias"] = dias
-    datos["periodos"] = metricas.PERIODOS
-    datos["graficos"] = {
-        "tendencia": datos["tendencia"],
-        "servicios": datos["servicios"],
-        "por_hora": datos["por_hora"],
-        "por_dia": datos["por_dia"],
-    }
-    return render(request, "turnos/dashboard.html", datos)

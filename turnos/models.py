@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.utils import timezone
 
@@ -13,6 +13,11 @@ class HorarioDisponible(models.Model):
     class Meta:
         unique_together = ('fecha', 'hora')
         ordering = ['fecha', 'hora']
+
+    @property
+    def inicio(self):
+        """Fecha + hora juntas, con zona horaria (para comparar con timezone.now())."""
+        return timezone.make_aware(datetime.combine(self.fecha, self.hora))
 
     def __str__(self):
         estado = "Disponible" if self.disponible else "Ocupado"
@@ -93,18 +98,66 @@ class Reserva(models.Model):
         super().delete(*args, **kwargs)
         self._liberar_horario()
 
-    def _liberar_horario(self):
+    def _liberar_horario(self, horario=None):
         """Deja el horario disponible si ya no tiene otra reserva pendiente."""
-        if not self.horario.reservas.filter(estado=EstadoReserva.PENDIENTE).exists():
-            self.horario.disponible = True
-            self.horario.save(update_fields=['disponible'])
+        horario = horario or self.horario
+        if not horario.reservas.filter(estado=EstadoReserva.PENDIENTE).exists():
+            horario.disponible = True
+            horario.save(update_fields=['disponible'])
+
+    def puede_cambiar_a(self, nuevo_estado):
+        """Reglas para los cambios de estado hechos por el staff desde el panel."""
+        if nuevo_estado == self.estado or nuevo_estado not in EstadoReserva.values:
+            return False
+        # Una cancelada no se reactiva: su horario ya pudo haberlo tomado otra persona
+        if self.estado == EstadoReserva.CANCELADA:
+            return False
+        # No se puede marcar como atendido un turno que todavía no llega
+        if nuevo_estado in (EstadoReserva.COMPLETADA, EstadoReserva.NO_ASISTIO):
+            return self.horario.fecha <= timezone.localdate()
+        return True
+
+    def cambiar_estado(self, nuevo_estado):
+        if not self.puede_cambiar_a(nuevo_estado):
+            return False
+        if nuevo_estado == EstadoReserva.CANCELADA:
+            self.cancelar()
+        else:
+            self.estado = nuevo_estado
+            self.save(update_fields=['estado'])
+        return True
+
+    @transaction.atomic
+    def reprogramar(self, nuevo_horario):
+        """Mueve una reserva pendiente a otro horario libre. Devuelve False si ya no estaba libre."""
+        # filter().update() es una sola consulta: si dos personas toman el mismo horario
+        # a la vez, solo a una le actualiza 1 fila; la otra recibe 0 y no se pisan.
+        tomado = HorarioDisponible.objects.filter(pk=nuevo_horario.pk, disponible=True).update(disponible=False)
+        if not tomado:
+            return False
+        anterior = self.horario
+        self.horario = nuevo_horario
+        self.save(update_fields=['horario'])
+        self._liberar_horario(anterior)
+        return True
+
+    # Anticipación mínima para que el cliente cancele o modifique su reserva
+    HORAS_ANTICIPACION = 12
+
+    @property
+    def dentro_del_plazo(self):
+        """True si es pendiente y faltan al menos HORAS_ANTICIPACION horas para el turno."""
+        if self.estado != EstadoReserva.PENDIENTE:
+            return False
+        return self.horario.inicio - timezone.now() >= timedelta(hours=self.HORAS_ANTICIPACION)
 
     @property
     def se_puede_cancelar(self):
-        if self.estado != EstadoReserva.PENDIENTE:
-            return False
-        inicio = timezone.make_aware(datetime.combine(self.horario.fecha, self.horario.hora))
-        return inicio > timezone.now()
+        return self.dentro_del_plazo
+
+    @property
+    def se_puede_modificar(self):
+        return self.dentro_del_plazo
 
     def cancelar(self):
         self.estado = EstadoReserva.CANCELADA

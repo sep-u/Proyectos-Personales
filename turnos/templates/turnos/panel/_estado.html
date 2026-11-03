@@ -1,0 +1,2 @@
+{# Badge de color según el estado. Uso: {% include 'turnos/panel/_estado.html' with r=reserva %} #}
+<span class="badge estado-{{ r.estado }}">{{ r.get_estado_display }}</span>

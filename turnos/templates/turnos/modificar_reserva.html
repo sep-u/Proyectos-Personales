@@ -1,0 +1,36 @@
+{% extends 'turnos/base.html' %}
+{% block title %}Modificar reserva{% endblock %}
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">Modificar reserva</h2>
+
+  <div class="card shadow-sm p-4 mx-auto" style="max-width: 600px;">
+    <p class="mb-1"><strong>Servicio:</strong> {{ reserva.servicio_display }}</p>
+    <p class="mb-3"><strong>Horario actual:</strong> {{ reserva.horario.fecha|date:"l d/m/Y" }} a las {{ reserva.horario.hora|time:"H:i" }}</p>
+
+    {% if horarios %}
+    <form method="post" onsubmit="return confirm('¿Confirmas el cambio de horario?');">
+      {% csrf_token %}
+      <label for="horario" class="form-label">Nuevo horario</label>
+      <select id="horario" name="horario" class="form-select" required>
+        <option value="">Selecciona un horario…</option>
+        {# regroup agrupa la lista por fecha para mostrar las horas de cada día juntas #}
+        {% regroup horarios by fecha as por_fecha %}
+        {% for grupo in por_fecha %}
+        <optgroup label="{{ grupo.grouper|date:'l d/m/Y' }}">
+          {% for h in grupo.list %}<option value="{{ h.id }}">{{ h.hora|time:"H:i" }}</option>{% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary flex-fill">Guardar cambio</button>
+        <a href="{% url 'mis_reservas' %}" class="btn btn-outline-secondary">Volver</a>
+      </div>
+    </form>
+    {% else %}
+    <p class="mb-3">No hay otros horarios disponibles por ahora.</p>
+    <a href="{% url 'mis_reservas' %}" class="btn btn-outline-secondary">Volver</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

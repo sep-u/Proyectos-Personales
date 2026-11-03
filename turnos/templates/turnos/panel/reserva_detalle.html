@@ -1,0 +1,109 @@
+{% extends 'turnos/panel/base_panel.html' %}
+{% load formato %}
+
+{% block title %}Reserva de {{ reserva.nombre }}{% endblock %}
+
+{% block content %}
+<a href="{% url 'panel_reservas' %}" class="chico text-decoration-none">← Volver a reservas</a>
+<div class="d-flex flex-wrap align-items-center gap-2 mt-1 mb-3">
+  <h1 class="mb-0">{{ reserva.nombre }}</h1>
+  {% include 'turnos/panel/_estado.html' with r=reserva %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7 d-flex flex-column gap-3">
+    <div class="tarjeta">
+      <h2 class="h6 fw-semibold">Turno</h2>
+      <dl class="row mb-0">
+        <dt class="col-sm-4">Fecha y hora</dt>
+        <dd class="col-sm-8">
+          <a href="{% url 'panel_agenda' %}?fecha={{ reserva.horario.fecha|date:'Y-m-d' }}">{{ reserva.horario.fecha|date:"l d/m/Y" }}</a>
+          a las {{ reserva.horario.hora|time:"H:i" }}
+        </dd>
+        <dt class="col-sm-4">Servicio</dt><dd class="col-sm-8">{{ reserva.servicio_display }}</dd>
+        <dt class="col-sm-4">Precio</dt><dd class="col-sm-8">{{ reserva.precio|clp }}</dd>
+        <dt class="col-sm-4">Cuenta</dt><dd class="col-sm-8">{{ reserva.usuario.username }}</dd>
+        <dt class="col-sm-4">Reservado el</dt><dd class="col-sm-8 mb-0">{{ reserva.creado|date:"d/m/Y H:i" }}</dd>
+      </dl>
+    </div>
+
+    <div class="tarjeta">
+      <h2 class="h6 fw-semibold">Datos de contacto y vehículo</h2>
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-2">
+          {% for campo in form %}
+          <div class="col-md-6">
+            <label class="form-label small mb-1" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+            {{ campo }}
+            {% for e in campo.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <button class="btn btn-primary btn-sm mt-3">Guardar cambios</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-5 d-flex flex-column gap-3">
+    <div class="tarjeta">
+      <h2 class="h6 fw-semibold">Cambiar estado</h2>
+      {% if acciones %}
+      <form method="post" action="{% url 'panel_cambiar_estado' %}" class="d-flex flex-wrap gap-2">
+        {% csrf_token %}
+        <input type="hidden" name="ids" value="{{ reserva.id }}">
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        {% for valor, etiqueta in acciones %}
+        <button class="btn btn-sm {% if valor == 'cancelada' %}btn-outline-danger{% elif valor == 'completada' %}btn-success{% else %}btn-outline-secondary{% endif %}"
+                name="estado" value="{{ valor }}"
+                {% if valor == 'cancelada' %}onclick="return confirm('¿Cancelar esta reserva? El horario quedará libre.');"{% endif %}>{{ etiqueta }}</button>
+        {% endfor %}
+      </form>
+      {% if reserva.estado == 'pendiente' and reserva.horario.fecha > hoy %}
+      <p class="chico mt-2 mb-0">"Completada" y "No asistió" aparecen el día del turno.</p>
+      {% endif %}
+      {% else %}
+      <p class="chico mb-0">Las reservas canceladas no se pueden reactivar (su horario ya pudo ser tomado). Si el cliente vuelve, debe reservar de nuevo.</p>
+      {% endif %}
+    </div>
+
+    {% if reserva.estado == 'pendiente' %}
+    <div class="tarjeta">
+      <h2 class="h6 fw-semibold">Reprogramar</h2>
+      {% if horarios_libres %}
+      <form method="post" action="{% url 'panel_reprogramar' reserva.id %}" class="d-flex gap-2"
+            onsubmit="return confirm('¿Mover la reserva al horario elegido?');">
+        {% csrf_token %}
+        <select name="horario" class="form-select form-select-sm" required aria-label="Nuevo horario">
+          <option value="">Elige un horario libre…</option>
+          {% regroup horarios_libres by fecha as por_fecha %}
+          {% for grupo in por_fecha %}
+          <optgroup label="{{ grupo.grouper|date:'l d/m/Y' }}">
+            {% for h in grupo.list %}<option value="{{ h.id }}">{{ h.hora|time:"H:i" }}</option>{% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+        <button class="btn btn-outline-primary btn-sm text-nowrap">Mover</button>
+      </form>
+      {% else %}
+      <p class="chico mb-0">No hay horarios libres. <a href="{% url 'generar_horarios' %}">Genera más horarios</a>.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="tarjeta">
+      <h2 class="h6 fw-semibold">Otras reservas de este cliente</h2>
+      {% if otras %}
+      <ul class="list-unstyled mb-0">
+        {% for o in otras %}
+        <li class="d-flex justify-content-between gap-2 py-1 border-bottom">
+          <a href="{% url 'panel_reserva' o.id %}" class="text-decoration-none">{{ o.horario.fecha|date:"d/m/Y" }} · {{ o.servicio_display }}</a>
+          {% include 'turnos/panel/_estado.html' with r=o %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="chico mb-0">Es su primera reserva.</p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

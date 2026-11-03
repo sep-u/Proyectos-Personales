@@ -1,0 +1,112 @@
+{% extends 'turnos/panel/base_panel.html' %}
+
+{% block title %}Horarios{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">Horarios</h1>
+
+<div class="tarjeta mb-3">
+  <h2 class="h6 fw-semibold">Próximos 14 días</h2>
+  <p class="chico">Turnos tomados / generados. En naranjo, días sin horarios. Haz clic para ver la agenda del día.</p>
+  <div class="row row-cols-3 row-cols-md-5 row-cols-xl-7 g-2">
+    {% for d in proximos_dias %}
+    <div class="col">
+      <a class="dia-chip {% if not d.total %}vacio{% endif %}" href="{% url 'panel_agenda' %}?fecha={{ d.fecha|date:'Y-m-d' }}">
+        <div class="chico">{{ d.nombre|slice:":3" }} {{ d.fecha|date:"d/m" }}</div>
+        <div class="fw-semibold">{% if d.total %}{{ d.ocupados }} / {{ d.total }}{% else %}—{% endif %}</div>
+        {% if d.total %}<div class="barra"><span style="width: {% widthratio d.ocupados d.total 100 %}%"></span></div>{% endif %}
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="tarjeta">
+      <h2 class="h6 fw-semibold">Generar horarios</h2>
+      <p class="chico">Los horarios que ya existen no se duplican.</p>
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-2">
+          <div class="col-6">
+            <label for="{{ form.fecha_inicio.id_for_label }}" class="form-label small mb-1">{{ form.fecha_inicio.label }}</label>
+            {{ form.fecha_inicio }}
+          </div>
+          <div class="col-6">
+            <label for="{{ form.fecha_fin.id_for_label }}" class="form-label small mb-1">{{ form.fecha_fin.label }}</label>
+            {{ form.fecha_fin }}
+          </div>
+          <div class="col-4">
+            <label for="{{ form.hora_inicio.id_for_label }}" class="form-label small mb-1">{{ form.hora_inicio.label }}</label>
+            {{ form.hora_inicio }}
+          </div>
+          <div class="col-4">
+            <label for="{{ form.hora_fin.id_for_label }}" class="form-label small mb-1">{{ form.hora_fin.label }}</label>
+            {{ form.hora_fin }}
+          </div>
+          <div class="col-4">
+            <label for="{{ form.intervalo_minutos.id_for_label }}" class="form-label small mb-1">{{ form.intervalo_minutos.label }}</label>
+            {{ form.intervalo_minutos }}
+          </div>
+          <div class="col-12">
+            <label class="form-label small mb-1 d-block">{{ form.dias_semana.label }}</label>
+            {{ form.dias_semana }}
+          </div>
+        </div>
+        {% if form.errors %}
+        <div class="alert alert-danger mt-2 mb-0">
+          {{ form.non_field_errors }}
+          {% for campo in form %}{% for e in campo.errors %}<div>{{ campo.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+        </div>
+        {% endif %}
+        <button type="submit" class="btn btn-primary mt-3">Generar horarios</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="tarjeta">
+      <h2 class="h6 fw-semibold">Cerrar días (feriados, vacaciones)</h2>
+      <p class="chico">Quita los horarios <strong>libres</strong> del rango. Las reservas existentes no se tocan; revísalas en la agenda.</p>
+      <form method="post" action="{% url 'panel_eliminar_libres' %}"
+            onsubmit="return confirm('¿Quitar todos los horarios libres de ese rango?');">
+        {% csrf_token %}
+        <div class="row g-2">
+          <div class="col-6">
+            <label for="{{ form_eliminar.fecha_inicio.id_for_label }}" class="form-label small mb-1">{{ form_eliminar.fecha_inicio.label }}</label>
+            {{ form_eliminar.fecha_inicio }}
+          </div>
+          <div class="col-6">
+            <label for="{{ form_eliminar.fecha_fin.id_for_label }}" class="form-label small mb-1">{{ form_eliminar.fecha_fin.label }}</label>
+            {{ form_eliminar.fecha_fin }}
+          </div>
+        </div>
+        <button class="btn btn-outline-danger mt-3">Quitar horarios libres</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    flatpickr(".flatpickr-fecha", {
+      dateFormat: "Y-m-d",
+      locale: "es",
+      disable: [
+        function (date) {
+          return date.getDay() === 0; // domingo: no se trabaja
+        }
+      ]
+    });
+  });
+</script>
+{% endblock %}

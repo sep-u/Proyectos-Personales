@@ -1,0 +1,47 @@
+{% extends 'turnos/panel/base_panel.html' %}
+{% load formato %}
+
+{% block title %}Servicios y precios{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Servicios y precios</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'panel_servicio_nuevo' %}">+ Nuevo servicio</a>
+</div>
+<p class="subtitulo">Cambiar un precio no afecta a las reservas ya hechas: cada reserva guarda el precio del momento.</p>
+
+<div class="row g-3">
+  {% for s in servicios %}
+  <div class="col-md-6 col-xl-4">
+    <div class="tarjeta h-100 d-flex flex-column {% if not s.activo %}opacity-75{% endif %}">
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <h2 class="h6 fw-semibold mb-1">{{ s.nombre }}</h2>
+        {% if s.activo %}<span class="badge text-bg-success">Activo</span>{% else %}<span class="badge text-bg-secondary">Oculto</span>{% endif %}
+      </div>
+      {% if s.descripcion %}<p class="chico mb-2">{{ s.descripcion }}</p>{% endif %}
+      <table class="table table-sm mb-2">
+        <tbody>
+        {% for p in s.precios.all %}
+          <tr><td>{{ p.get_tamano_vehiculo_display }}</td><td class="text-end">{% if s.precio_desde %}Desde {% endif %}{{ p.precio|clp }}</td></tr>
+        {% empty %}
+          <tr><td class="text-danger">Sin precios: los clientes no podrán elegirlo</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="mt-auto d-flex justify-content-between align-items-center">
+        <span class="chico">{{ s.total_reservas }} reserva{{ s.total_reservas|pluralize }} en total</span>
+        <div class="d-flex gap-2">
+          <form method="post" action="{% url 'panel_servicio_activar' s.id %}">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-secondary">{% if s.activo %}Ocultar{% else %}Activar{% endif %}</button>
+          </form>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'panel_servicio' s.id %}">Editar</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <p>Aún no hay servicios.</p>
+  {% endfor %}
+</div>
+{% endblock %}
