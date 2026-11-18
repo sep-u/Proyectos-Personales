@@ -1,0 +1,5 @@
+[run]
+source = turnos
+omit =
+    turnos/migrations/*
+    turnos/tests.py

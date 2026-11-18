@@ -12,6 +12,7 @@ from .models import Reserva
 from django.shortcuts import get_object_or_404, redirect
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from .models import Reserva, HorarioDisponible, PrecioServicio, Servicio
 # Create your views here.
@@ -52,18 +53,26 @@ def reservas(request):
             PrecioServicio.objects.select_related("servicio"), id=precio_servicio_id, servicio__activo=True
         )
 
-        # Guardar la reserva
-        Reserva.objects.create(
-            usuario=request.user,
-            horario=horario,
-            nombre=nombre,
-            email=email,
-            telefono=telefono,
-            Marca_modelo_auto=marca_modelo_auto,
-            servicio=precio_servicio.servicio,
-            tamano_vehiculo=precio_servicio.tamano_vehiculo,
-            precio=precio_servicio.precio,
-        )
+        # Ocupar el horario y guardar la reserva (CP-06: evita reservas duplicadas).
+        # El filter(...).update(...) revisa y ocupa en un solo UPDATE ... WHERE disponible = true,
+        # así que si dos clientes llegan a la vez la base de datos deja pasar solo a uno.
+        # atomic(): si crear la reserva falla, el horario vuelve a quedar disponible.
+        with transaction.atomic():
+            tomado = HorarioDisponible.objects.filter(pk=horario.pk, disponible=True).update(disponible=False)
+            if not tomado:
+                messages.error(request, "Ese horario acaba de ser reservado por otra persona. Por favor elige otro.")
+                return redirect("reservas")
+            Reserva.objects.create(
+                usuario=request.user,
+                horario=horario,
+                nombre=nombre,
+                email=email,
+                telefono=telefono,
+                Marca_modelo_auto=marca_modelo_auto,
+                servicio=precio_servicio.servicio,
+                tamano_vehiculo=precio_servicio.tamano_vehiculo,
+                precio=precio_servicio.precio,
+            )
 
         # Enviar correo de confirmación
         asunto = "Confirmación de reserva - CarWash"

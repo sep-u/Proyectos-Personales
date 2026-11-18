@@ -1,7 +1,9 @@
+import threading
 from datetime import time, timedelta
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.db import connection
+from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -209,3 +211,217 @@ class ExportarDashboardTests(PanelTestBase):
     def test_periodo_invalido_usa_30_dias(self):
         respuesta = self.client.get(reverse("dashboard_exportar"), {"periodo": "abc"})
         self.assertEqual(respuesta.status_code, 200)
+
+
+class ReservarTests(PanelTestBase):
+    """Flujo principal del cliente: reservar un horario desde /reservas/."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.cliente)
+        self.precio = PrecioServicio.objects.get(servicio=self.servicio)
+
+    def datos(self, **cambios):
+        datos = {
+            "nombre": "Ana", "email": "ana@test.cl", "telefono": "912345678",
+            "precio_servicio": self.precio.id, "horario": self.h_libre.id,
+            "marca_modelo_auto": "Toyota Yaris",
+        }
+        datos.update(cambios)
+        return datos
+
+    def test_pagina_carga(self):
+        self.assertEqual(self.client.get(reverse("reservas")).status_code, 200)
+
+    def test_reservar_ocupa_el_horario_y_envia_correo(self):
+        from django.core import mail
+
+        respuesta = self.client.post(reverse("reservas"), self.datos())
+        self.assertRedirects(respuesta, reverse("mis_reservas"))
+        reserva = Reserva.objects.get()
+        self.assertEqual(reserva.usuario, self.cliente)
+        self.assertEqual(reserva.precio, 10000)  # el precio se copia del servicio
+        self.h_libre.refresh_from_db()
+        self.assertFalse(self.h_libre.disponible)
+        self.assertEqual(len(mail.outbox), 1)  # en tests Django guarda los correos en memoria
+
+    def test_campos_vacios_no_crean_reserva(self):
+        self.client.post(reverse("reservas"), self.datos(nombre="", telefono=""))
+        self.assertFalse(Reserva.objects.exists())
+
+    def test_horario_ocupado_da_404(self):
+        self.crear_reserva(self.h_libre)
+        respuesta = self.client.post(reverse("reservas"), self.datos())
+        self.assertEqual(respuesta.status_code, 404)
+        self.assertEqual(Reserva.objects.count(), 1)
+
+    def test_servicio_inactivo_da_404(self):
+        self.servicio.activo = False
+        self.servicio.save()
+        respuesta = self.client.post(reverse("reservas"), self.datos())
+        self.assertEqual(respuesta.status_code, 404)
+
+    def test_sin_sesion_redirige_al_login(self):
+        self.client.logout()
+        respuesta = self.client.get(reverse("reservas"))
+        self.assertEqual(respuesta.status_code, 302)
+
+
+class CancelarReservaClienteTests(PanelTestBase):
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.cliente)
+
+    def test_cancelar_con_anticipacion_libera_horario(self):
+        lejos = timezone.localdate() + timedelta(days=3)
+        horario = HorarioDisponible.objects.create(fecha=lejos, hora=time(10))
+        r = self.crear_reserva(horario)
+        self.client.post(reverse("cancelar_reserva", args=[r.id]))
+        r.refresh_from_db()
+        horario.refresh_from_db()
+        self.assertEqual(r.estado, EstadoReserva.CANCELADA)
+        self.assertTrue(horario.disponible)
+
+    def test_no_cancelar_con_menos_de_12_horas(self):
+        momento = timezone.localtime() + timedelta(hours=5)
+        horario = HorarioDisponible.objects.create(fecha=momento.date(), hora=momento.time().replace(microsecond=0))
+        r = self.crear_reserva(horario)
+        self.client.post(reverse("cancelar_reserva", args=[r.id]))
+        r.refresh_from_db()
+        self.assertEqual(r.estado, EstadoReserva.PENDIENTE)
+
+    def test_no_cancelar_reserva_ajena(self):
+        r = self.crear_reserva(self.h_manana)
+        otro = User.objects.create_user("otro@test.cl", password="clave123")
+        self.client.force_login(otro)
+        respuesta = self.client.post(reverse("cancelar_reserva", args=[r.id]))
+        self.assertEqual(respuesta.status_code, 404)
+
+    def test_mis_reservas_muestra_solo_las_propias(self):
+        mia = self.crear_reserva(self.h_manana)
+        otro = User.objects.create_user("otro@test.cl", password="clave123")
+        Reserva.objects.create(usuario=otro, horario=self.h_libre, nombre="Otro", email="o@test.cl",
+                               telefono="1", servicio=self.servicio, tamano_vehiculo="unico", precio=1)
+        respuesta = self.client.get(reverse("mis_reservas"))
+        self.assertEqual(list(respuesta.context["reservas"]), [mia])
+
+
+class CuentasTests(TestCase):
+    """Registro, inicio y cierre de sesión (el email se usa como username)."""
+
+    def registrar(self, **cambios):
+        datos = {"first_name": "Ana", "last_name": "Pérez", "email": "ana@test.cl", "password": "clave123"}
+        datos.update(cambios)
+        return self.client.post(reverse("register"), datos)
+
+    def test_paginas_publicas_cargan(self):
+        for nombre in ("home", "lista_precios", "register", "login"):
+            self.assertEqual(self.client.get(reverse(nombre)).status_code, 200, nombre)
+
+    def test_registro_crea_usuario_con_email_como_username(self):
+        respuesta = self.registrar()
+        self.assertRedirects(respuesta, reverse("login"))
+        usuario = User.objects.get(username="ana@test.cl")
+        self.assertTrue(usuario.check_password("clave123"))  # se guarda cifrada, no en texto plano
+        self.assertFalse(usuario.is_staff)
+
+    def test_registro_con_email_repetido_no_duplica(self):
+        self.registrar()
+        respuesta = self.registrar(first_name="Otra")
+        self.assertRedirects(respuesta, reverse("register"))
+        self.assertEqual(User.objects.count(), 1)
+
+    def test_registro_con_clave_corta_muestra_error(self):
+        respuesta = self.registrar(password="123")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFalse(User.objects.exists())
+
+    def test_login_correcto(self):
+        User.objects.create_user("ana@test.cl", password="clave123")
+        respuesta = self.client.post(reverse("login"), {"email": "ana@test.cl", "password": "clave123"})
+        self.assertRedirects(respuesta, reverse("home"))
+        self.assertIn("_auth_user_id", self.client.session)
+
+    def test_login_con_clave_incorrecta(self):
+        User.objects.create_user("ana@test.cl", password="clave123")
+        respuesta = self.client.post(reverse("login"), {"email": "ana@test.cl", "password": "mala"})
+        self.assertRedirects(respuesta, reverse("login"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_logout(self):
+        usuario = User.objects.create_user("ana@test.cl", password="clave123")
+        self.client.force_login(usuario)
+        self.client.get(reverse("logout"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+
+class DatosDemoTests(TestCase):
+    def setUp(self):
+        servicio = Servicio.objects.create(nombre="Lavado demo test")
+        PrecioServicio.objects.create(servicio=servicio, tamano_vehiculo="unico", precio=10000)
+
+    def ejecutar(self, *args):
+        from io import StringIO
+        from django.core.management import call_command
+        call_command("datos_demo", *args, stdout=StringIO())
+
+    def test_cargar_y_borrar(self):
+        self.ejecutar("--dias", "5", "--futuro", "3")
+        demo = Reserva.objects.filter(usuario__username__startswith="demo_")
+        self.assertTrue(demo.exists())
+        self.assertTrue(demo.filter(horario__fecha__gte=timezone.localdate()).exists())
+
+        self.ejecutar("--borrar")
+        self.assertFalse(User.objects.filter(username__startswith="demo_").exists())
+        self.assertFalse(Reserva.objects.exists())
+        # Los horarios futuros quedan libres para clientes reales
+        self.assertFalse(HorarioDisponible.objects.filter(fecha__gte=timezone.localdate(), disponible=False).exists())
+
+    def test_no_carga_dos_veces(self):
+        from django.core.management.base import CommandError
+        self.ejecutar("--dias", "2")
+        with self.assertRaises(CommandError):
+            self.ejecutar("--dias", "2")
+
+
+class ConcurrenciaReservaTests(TransactionTestCase):
+    """CP-06: dos clientes reservan el mismo horario exactamente al mismo tiempo.
+
+    Usa TransactionTestCase (y no TestCase) porque cada hilo abre su propia conexión
+    a la base de datos y necesita ver los datos ya confirmados (commit). TestCase
+    envuelve todo en una transacción que los otros hilos no pueden ver.
+    """
+
+    def setUp(self):
+        servicio = Servicio.objects.create(nombre="Lavado CP-06")
+        self.precio = PrecioServicio.objects.create(servicio=servicio, tamano_vehiculo="unico", precio=10000)
+        manana = timezone.localdate() + timedelta(days=1)
+        self.horario = HorarioDisponible.objects.create(fecha=manana, hora=time(10))
+        self.clientes = []
+        for i in range(2):
+            usuario = User.objects.create_user(f"cliente{i}@test.cl", password="clave123")
+            navegador = Client()  # un "navegador" independiente por cliente
+            navegador.force_login(usuario)
+            self.clientes.append(navegador)
+
+    def test_solo_una_reserva_queda_registrada(self):
+        barrera = threading.Barrier(len(self.clientes))  # hace que ambos hilos partan a la vez
+        datos = {
+            "nombre": "Cliente", "email": "c@test.cl", "telefono": "912345678",
+            "precio_servicio": self.precio.id, "horario": self.horario.id, "marca_modelo_auto": "Kia Rio",
+        }
+
+        def reservar(navegador):
+            try:
+                barrera.wait()
+                navegador.post(reverse("reservas"), datos)
+            finally:
+                connection.close()  # cada hilo cierra su conexión, si no la BD de test queda "en uso"
+
+        hilos = [threading.Thread(target=reservar, args=(n,)) for n in self.clientes]
+        for hilo in hilos:
+            hilo.start()
+        for hilo in hilos:
+            hilo.join()
+
+        self.assertEqual(Reserva.objects.filter(horario=self.horario).count(), 1)

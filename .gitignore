@@ -28,3 +28,7 @@ CLAUDE.md
 .idea/
 Thumbs.db
 desktop.ini
+
+# Reportes de cobertura (se generan con coverage)
+.coverage
+htmlcov/
