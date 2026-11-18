@@ -32,3 +32,6 @@ desktop.ini
 # Reportes de cobertura (se generan con coverage)
 .coverage
 htmlcov/
+
+# Reportes de la prueba de carga (evidencia local para el informe)
+pruebas/reporte_carga*.html

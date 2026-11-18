@@ -90,7 +90,12 @@ DATABASES = {
         'PORT': tmpPostgres.port,
         'OPTIONS': {
             'sslmode': dict(parse_qsl(tmpPostgres.query)).get('sslmode', 'require')
-        }
+        },
+        # Reutiliza la conexión a Neon hasta 60 s en vez de abrir una nueva en cada
+        # petición (abrirla cuesta 0,4-1,4 s; una consulta ya conectada, ~50 ms). CP-16.
+        'CONN_MAX_AGE': 60,
+        # Antes de reutilizarla verifica que siga viva (Neon cierra las inactivas).
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
