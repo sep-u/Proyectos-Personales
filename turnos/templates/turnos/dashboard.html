@@ -45,11 +45,16 @@
       <h1 class="h3 fw-bold mb-1">Dashboard del negocio</h1>
       <p class="text-muted mb-0">{{ inicio|date:"d/m/Y" }} – {{ hoy|date:"d/m/Y" }} · según la fecha del turno</p>
     </div>
-    <div class="btn-group" role="group" aria-label="Período">
-      {% for valor, nombre in periodos.items %}
-      <a href="?periodo={{ valor }}" class="btn btn-sm {% if valor == dias %}btn-primary{% else %}btn-outline-primary{% endif %}"
-         {% if valor == dias %}aria-current="true"{% endif %}>{{ nombre }}</a>
-      {% endfor %}
+    <div class="d-flex flex-wrap gap-2">
+      <div class="btn-group" role="group" aria-label="Período">
+        {% for valor, nombre in periodos.items %}
+        <a href="?periodo={{ valor }}" class="btn btn-sm {% if valor == dias %}btn-primary{% else %}btn-outline-primary{% endif %}"
+           {% if valor == dias %}aria-current="true"{% endif %}>{{ nombre }}</a>
+        {% endfor %}
+      </div>
+      <a href="{% url 'dashboard_exportar' %}?periodo={{ dias }}" class="btn btn-sm btn-success">
+        ⬇ Descargar Excel
+      </a>
     </div>
   </div>
 

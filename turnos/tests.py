@@ -179,3 +179,33 @@ class ModificarReservaClienteTests(PanelTestBase):
         respuesta = self.client.get(reverse("modificar_reserva", args=[r.id]))
         self.assertEqual(respuesta.status_code, 200)
         self.assertNotIn(pasado, respuesta.context["horarios"])
+
+
+class ExportarDashboardTests(PanelTestBase):
+    def test_descarga_excel_con_datos_del_periodo(self):
+        from io import BytesIO
+        from openpyxl import load_workbook
+
+        r = self.crear_reserva(self.h_hoy)
+        r.cambiar_estado(EstadoReserva.COMPLETADA)
+        respuesta = self.client.get(reverse("dashboard_exportar"), {"periodo": 7})
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("attachment", respuesta["Content-Disposition"])
+        self.assertIn(".xlsx", respuesta["Content-Disposition"])
+
+        wb = load_workbook(BytesIO(respuesta.content))
+        self.assertIn("Resumen", wb.sheetnames)
+        self.assertIn("Reservas", wb.sheetnames)
+        hoja = wb["Reservas"]
+        self.assertEqual(hoja.max_row, 2)  # encabezado + 1 reserva
+        self.assertEqual(hoja["C2"].value, "Ana")
+        self.assertEqual(hoja["J2"].value, 10000)
+
+    def test_cliente_normal_no_puede_descargar(self):
+        self.client.force_login(self.cliente)
+        self.assertEqual(self.client.get(reverse("dashboard_exportar")).status_code, 302)
+
+    def test_periodo_invalido_usa_30_dias(self):
+        respuesta = self.client.get(reverse("dashboard_exportar"), {"periodo": "abc"})
+        self.assertEqual(respuesta.status_code, 200)

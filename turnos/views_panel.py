@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
+from django.http import HttpResponse
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q, Sum
@@ -15,7 +16,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from . import metricas
+from . import exportar, metricas
 from .forms import (EliminarHorariosForm, GenerarHorariosForm, PrecioServicioFormSet,
                     ReservaPanelForm, ServicioForm)
 from .models import EstadoReserva, HorarioDisponible, Reserva, Servicio
@@ -366,15 +367,18 @@ def servicio_activar(request, servicio_id):
 
 # ---------- Dashboard ----------
 
-@staff_required
-def dashboard_staff(request):
+def _periodo(request):
+    """Lee ?periodo= de la URL; si no es válido usa 30 días."""
     try:
         dias = int(request.GET.get("periodo", 30))
     except ValueError:
-        dias = 30
-    if dias not in metricas.PERIODOS:
-        dias = 30
+        return 30
+    return dias if dias in metricas.PERIODOS else 30
 
+
+@staff_required
+def dashboard_staff(request):
+    dias = _periodo(request)
     datos = metricas.calcular(dias)
     datos["dias"] = dias
     datos["periodos"] = metricas.PERIODOS
@@ -386,3 +390,19 @@ def dashboard_staff(request):
     }
     datos["seccion"] = "dashboard"
     return render(request, "turnos/dashboard.html", datos)
+
+
+@staff_required
+def exportar_dashboard(request):
+    """Descarga el dashboard del período elegido como archivo Excel."""
+    dias = _periodo(request)
+    datos = metricas.calcular(dias)
+    archivo = exportar.construir_excel(datos)
+    nombre = f"dashboard_carwash_{datos['inicio']:%Y%m%d}_{datos['hoy']:%Y%m%d}.xlsx"
+    respuesta = HttpResponse(
+        archivo,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    # "attachment" hace que el navegador lo descargue en vez de intentar abrirlo
+    respuesta["Content-Disposition"] = f'attachment; filename="{nombre}"'
+    return respuesta

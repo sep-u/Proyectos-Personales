@@ -26,4 +26,5 @@ urlpatterns = [
     path('panel/servicios/<int:servicio_id>/', views_panel.servicio_editar, name='panel_servicio'),
     path('panel/servicios/<int:servicio_id>/activar/', views_panel.servicio_activar, name='panel_servicio_activar'),
     path('panel/dashboard/', views_panel.dashboard_staff, name='dashboard_staff'),
+    path('panel/dashboard/exportar/', views_panel.exportar_dashboard, name='dashboard_exportar'),
 ]
