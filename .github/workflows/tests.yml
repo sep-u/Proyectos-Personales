@@ -1,0 +1,59 @@
+# Integración continua: en cada push o pull request a main, GitHub crea una
+# máquina Ubuntu limpia, instala el proyecto, ejecuta los tests y mide la cobertura.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    # Base de datos PostgreSQL propia y desechable para los tests.
+    # No usamos Neon: así no hay que subir contraseñas reales a GitHub.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: carwash
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/carwash?sslmode=disable
+      SECRET_KEY: clave-solo-para-ci-no-es-secreta
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar librerías del sistema (psycopg2 necesita libpq)
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Revisar migraciones pendientes
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Ejecutar tests con cobertura
+        run: coverage run manage.py test turnos
+
+      - name: Reporte de cobertura (falla si baja de 80 %)
+        run: coverage report --fail-under=80
