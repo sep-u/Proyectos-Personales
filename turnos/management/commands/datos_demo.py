@@ -2,10 +2,12 @@
 
     python manage.py datos_demo            # carga 90 días de reservas pasadas
     python manage.py datos_demo --dias 30  # otro rango
+    python manage.py datos_demo --futuro 7 # además, reservas pendientes para los próximos 7 días
     python manage.py datos_demo --borrar   # elimina solo los datos demo
 
-Solo crea reservas en fechas pasadas, para no ocupar horarios futuros que
-pueden reservar clientes reales. Todo lo demo se identifica por usuarios
+Por defecto solo crea reservas en fechas pasadas, para no ocupar horarios futuros
+que pueden reservar clientes reales. Con --futuro también ocupa algunos turnos
+próximos (útil para ver "Ocupación", "Por cobrar" y "Próximas" en el dashboard). Todo lo demo se identifica por usuarios
 cuyo username empieza con "demo_".
 """
 import random
@@ -42,13 +44,15 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--dias", type=int, default=90, help="Días hacia atrás a generar (por defecto 90)")
         parser.add_argument("--borrar", action="store_true", help="Elimina los datos demo en vez de crearlos")
+        parser.add_argument("--futuro", type=int, default=0,
+                            help="Días hacia adelante con reservas pendientes (por defecto 0 = ninguno)")
         parser.add_argument("--semilla", type=int, default=2026, help="Semilla aleatoria, para datos reproducibles")
 
     def handle(self, *args, **opciones):
         if opciones["borrar"]:
             self.borrar()
         else:
-            self.cargar(opciones["dias"], opciones["semilla"])
+            self.cargar(opciones["dias"], opciones["semilla"], opciones["futuro"])
 
     @transaction.atomic
     def borrar(self):
@@ -57,15 +61,19 @@ class Command(BaseCommand):
         horario_ids = set(reservas.values_list("horario_id", flat=True))
         n_reservas = reservas.count()
         reservas.delete()
-        # Horarios que solo tenían reservas demo: se borran (son todos pasados)
-        n_horarios, _ = HorarioDisponible.objects.filter(id__in=horario_ids, reservas__isnull=True).delete()
+        hoy = timezone.localdate()
+        sin_reservas = HorarioDisponible.objects.filter(id__in=horario_ids, reservas__isnull=True)
+        # Pasados que solo tenían reservas demo: se borran. Futuros: se liberan
+        # (no se borran, porque pueden ser horarios generados por el staff).
+        n_horarios, _ = sin_reservas.filter(fecha__lt=hoy).delete()
+        sin_reservas.filter(fecha__gte=hoy).update(disponible=True)
         n_usuarios, _ = usuarios.delete()
         self.stdout.write(self.style.SUCCESS(
             f"Eliminados: {n_reservas} reservas, {n_horarios} horarios y los usuarios demo."
         ))
 
     @transaction.atomic
-    def cargar(self, dias, semilla):
+    def cargar(self, dias, semilla, futuro=0):
         if User.objects.filter(username__startswith=PREFIJO).exists():
             raise CommandError("Ya hay datos demo cargados. Ejecuta primero: python manage.py datos_demo --borrar")
 
@@ -127,6 +135,27 @@ class Command(BaseCommand):
                     )[0],
                 )
                 creadas += 1
+
+        # Próximos días: turnos libres (o nuevos) ocupados con reservas pendientes
+        pendientes = 0
+        for adelante in range(0, futuro + 1):
+            fecha = hoy + timedelta(days=adelante)
+            if fecha.weekday() == 6:
+                continue
+            for hora in HORAS:
+                horario, _ = HorarioDisponible.objects.get_or_create(fecha=fecha, hora=hora)
+                if horario.inicio <= timezone.now() or not horario.disponible or rnd.random() > 0.5:
+                    continue
+                usuario, auto, telefono = rnd.choice(clientes)
+                precio = rnd.choices(precios, pesos)[0]
+                Reserva.objects.create(
+                    usuario=usuario, horario=horario, nombre=f"{usuario.first_name} {usuario.last_name}",
+                    email=usuario.email, telefono=telefono, servicio=precio.servicio,
+                    tamano_vehiculo=precio.tamano_vehiculo, precio=precio.precio, Marca_modelo_auto=auto,
+                )
+                pendientes += 1
+        if futuro:
+            self.stdout.write(f"Creadas {pendientes} reservas pendientes para los próximos {futuro} días.")
 
         # Las canceladas liberan su horario; como son fechas pasadas, no afecta a nadie
         self.stdout.write(self.style.SUCCESS(
