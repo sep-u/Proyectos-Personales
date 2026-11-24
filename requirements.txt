@@ -8,13 +8,10 @@ jsonpointer==2.1
 
 pillow==11.0.0
 
-psycopg2==2.9.10
-
-pygame==2.6.0
+psycopg2-binary==2.9.10
 
 setuptools==72.1.0
 sqlparse==0.5.1
-tk==0.1.0
 
 tzdata==2024.1
 
@@ -24,3 +21,7 @@ openpyxl==3.1.5
 
 coverage==7.17.3
 python-dotenv==1.2.1
+
+# Para el despliegue en Render
+gunicorn==23.0.0
+whitenoise==6.9.0

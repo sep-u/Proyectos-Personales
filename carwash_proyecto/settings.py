@@ -25,10 +25,25 @@ load_dotenv(BASE_DIR / "carwash_proyecto" / ".env")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("SECRET_KEY",)
 
+# Render define la variable RENDER en sus servidores; en el PC local no existe.
+EN_RENDER = 'RENDER' in os.environ
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = not EN_RENDER
 
 ALLOWED_HOSTS = []
+
+if EN_RENDER:
+    # Dominio público que Render asigna al servicio (algo.onrender.com)
+    host_render = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+    if host_render:
+        ALLOWED_HOSTS.append(host_render)
+    # Render recibe HTTPS y reenvía por HTTP interno; este encabezado le avisa a
+    # Django que la petición original era segura (si no, los formularios dan 403).
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Las cookies de sesión y CSRF solo viajan por HTTPS
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 # Application definition
@@ -45,6 +60,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', # sirve CSS/JS/imágenes en producción
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -137,6 +153,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = '/static/'
+# Carpeta donde collectstatic reúne los archivos para producción (la crea build.sh)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -157,6 +175,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
+# Si el servidor de correo no responde en 10 s, sigue sin dejar pegada la reserva
+EMAIL_TIMEOUT = 10
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'carwash.notificaciones@gmail.com')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
