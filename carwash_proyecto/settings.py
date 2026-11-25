@@ -38,6 +38,10 @@ if EN_RENDER:
     host_render = os.getenv('RENDER_EXTERNAL_HOSTNAME')
     if host_render:
         ALLOWED_HOSTS.append(host_render)
+    # Dominios propios, separados por coma (variable DOMINIOS en Render)
+    for dominio in os.getenv('DOMINIOS', '').split(','):
+        if dominio.strip():
+            ALLOWED_HOSTS.append(dominio.strip())
     # Render recibe HTTPS y reenvía por HTTP interno; este encabezado le avisa a
     # Django que la petición original era segura (si no, los formularios dan 403).
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
